@@ -1,0 +1,2501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rfq_chatbot_ms — Architecture Brief v2 F</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --bg-2: #0d1219;
+    --surface: #111720;
+    --surface-2: #151d28;
+    --border: #1e2634;
+    --border-strong: #2a3444;
+    --ink: #e8eef5;
+    --ink-2: #c8d2df;
+    --ink-3: #9aa7b8;
+    --ink-4: #6b7a8e;
+    --ink-5: #4a5668;
+    --blue: #5ba3e0;
+    --blue-soft: rgba(91,163,224,0.12);
+    --green: #5ac98a;
+    --green-soft: rgba(90,201,138,0.12);
+    --amber: #f0b757;
+    --amber-soft: rgba(240,183,87,0.12);
+    --red: #e56b7a;
+    --red-soft: rgba(229,107,122,0.12);
+    --purple: #9b7fd6;
+    --purple-soft: rgba(155,127,214,0.12);
+    --cyan: #5fd1c9;
+    --cyan-soft: rgba(95,209,201,0.12);
+    --pink: #e580b8;
+    --pink-soft: rgba(229,128,184,0.12);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; font-weight: 400; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 48px;
+  }
+
+  /* ===== COVER ===== */
+  .cover {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0e14 0%, #0d1624 50%, #0a0e14 100%);
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(91,163,224,0.08), transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(155,127,214,0.06), transparent 50%);
+    pointer-events: none;
+  }
+  .cover-inner { position: relative; width: 100%; }
+  .cover-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 24px;
+    display: inline-block;
+    padding: 6px 14px;
+    border: 1px solid var(--blue);
+    border-radius: 3px;
+    background: var(--blue-soft);
+  }
+  .cover h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 20px;
+    letter-spacing: -0.5px;
+  }
+  .cover h1 em {
+    font-style: italic;
+    color: var(--blue);
+    font-weight: 500;
+  }
+  .cover-sub {
+    font-size: 17px;
+    color: var(--ink-3);
+    font-weight: 300;
+    margin-bottom: 44px;
+    max-width: 680px;
+    line-height: 1.7;
+  }
+  .cover-meta {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    font-size: 12px;
+    color: var(--ink-4);
+    max-width: 700px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .cover-meta strong {
+    color: var(--ink-2);
+    font-weight: 500;
+    display: block;
+    margin-bottom: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  @media(max-width:760px) { .cover-meta { grid-template-columns: 1fr 1fr; } .cover h1 { font-size: 34px; } }
+
+  /* ===== SECTIONS ===== */
+  section { padding: 64px 0 48px; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  .sh { margin-bottom: 32px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .sh-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--blue);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .sh h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.25;
+    letter-spacing: -0.3px;
+  }
+  .sh p {
+    color: var(--ink-3);
+    font-size: 14px;
+    margin-top: 8px;
+    max-width: 720px;
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 32px 0 14px;
+    font-family: 'Inter', sans-serif;
+  }
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin: 20px 0 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  p { color: var(--ink-3); font-size: 14.5px; margin-bottom: 14px; line-height: 1.75; }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+  em { color: var(--ink-2); font-style: italic; }
+
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    background: var(--surface-2);
+    color: var(--blue);
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  ul, ol { margin: 10px 0 18px 20px; color: var(--ink-3); font-size: 14.5px; }
+  ul li, ol li { margin-bottom: 8px; line-height: 1.7; }
+  ul li::marker { color: var(--ink-5); }
+
+  /* ===== CORE QUESTION BOX ===== */
+  .core-question {
+    background: var(--surface);
+    border: 2px solid var(--blue);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    text-align: center;
+    margin: 8px 0 32px;
+    position: relative;
+  }
+  .core-question .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 14px;
+  }
+  .core-question .question {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.35;
+    margin-bottom: 18px;
+  }
+  .core-question .answer {
+    font-size: 15px;
+    color: var(--ink-3);
+    max-width: 680px;
+    margin: 0 auto;
+    line-height: 1.8;
+  }
+  .core-question .answer strong { color: var(--ink); }
+
+  /* ===== ARCHITECTURAL CHOICES SLIDE ===== */
+  .choices-table {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin: 20px 0;
+    position: relative;
+  }
+  .choices-table::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--purple), var(--green), var(--amber));
+  }
+  .choices-table .row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    align-items: baseline;
+  }
+  .choices-table .row:last-child { border-bottom: none; }
+  .choices-table .row:hover { background: var(--surface-2); }
+  .choices-table .k {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--blue);
+  }
+  .choices-table .v {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+  .choices-table .v strong { color: var(--ink); font-weight: 600; }
+  .choices-table .opt-row .k { color: var(--ink-4); }
+  .choices-table .opt-row .v { color: var(--ink-3); font-size: 13px; font-style: italic; }
+  @media(max-width:760px) {
+    .choices-table .row { grid-template-columns: 1fr; gap: 4px; padding: 14px 18px; }
+  }
+
+  /* ===== PILLAR CARD ===== */
+  .pillar {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    margin: 20px 0;
+    position: relative;
+  }
+  .pillar::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 24px; bottom: 24px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+  }
+  .pillar.p1::before { background: var(--blue); }
+  .pillar.p2::before { background: var(--green); }
+  .pillar.p3::before { background: var(--amber); }
+  .pillar.p4::before { background: var(--purple); }
+
+  .pillar-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .pillar-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 3px;
+    letter-spacing: 1.5px;
+  }
+  .pillar.p1 .pillar-num { background: var(--blue-soft); color: var(--blue); }
+  .pillar.p2 .pillar-num { background: var(--green-soft); color: var(--green); }
+  .pillar.p3 .pillar-num { background: var(--amber-soft); color: var(--amber); }
+  .pillar.p4 .pillar-num { background: var(--purple-soft); color: var(--purple); }
+  .pillar h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+  }
+  .pillar .one-liner {
+    font-size: 14px;
+    color: var(--ink-3);
+    font-style: italic;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  /* ===== CALLOUT / INSIGHT BOX ===== */
+  .callout {
+    background: var(--surface);
+    border-left: 4px solid var(--blue);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 22px 26px;
+    margin: 22px 0;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.amber { border-left-color: var(--amber); }
+  .callout.red { border-left-color: var(--red); }
+  .callout.purple { border-left-color: var(--purple); }
+  .callout .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .callout.green .tag { color: var(--green); }
+  .callout.amber .tag { color: var(--amber); }
+  .callout.red .tag { color: var(--red); }
+  .callout.purple .tag { color: var(--purple); }
+  .callout p { margin-bottom: 8px; color: var(--ink-3); font-size: 14px; }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ===== CODE BLOCK ===== */
+  pre {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    overflow-x: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink-2);
+    margin: 16px 0;
+  }
+  pre .c { color: var(--ink-5); }
+  pre .k { color: var(--purple); }
+  pre .s { color: var(--green); }
+  pre .n { color: var(--blue); }
+
+  /* ===== COMPARISON BOX ===== */
+  .comp-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 20px 0;
+  }
+  @media(max-width:640px) { .comp-box { grid-template-columns: 1fr; } }
+  .comp-side { padding: 24px; font-size: 13.5px; color: var(--ink-3); line-height: 1.7; }
+  .comp-rejected { background: var(--red-soft); border-right: 1px solid var(--border); }
+  @media(max-width:640px) { .comp-rejected { border-right: none; border-bottom: 1px solid var(--border); } }
+  .comp-chosen { background: var(--green-soft); }
+  .comp-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .comp-rejected .comp-label { color: var(--red); }
+  .comp-chosen .comp-label { color: var(--green); }
+  .comp-side p { margin-bottom: 8px; font-size: 13px; }
+  .comp-side p:last-child { margin-bottom: 0; }
+  .comp-side strong { color: var(--ink); }
+
+  /* ===== TABLE ===== */
+  .tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 18px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .tbl th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--blue);
+    font-weight: 600;
+    padding: 14px 16px;
+    background: var(--bg-2);
+    border-bottom: 2px solid var(--border-strong);
+  }
+  .tbl td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--ink-3);
+    line-height: 1.6;
+  }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl td strong { color: var(--ink); }
+  .tbl code { font-size: 11.5px; }
+
+  /* ===== TAGS ===== */
+  .tag-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 3px;
+    display: inline-block;
+    letter-spacing: 0.5px;
+  }
+  .tag-det { background: var(--green-soft); color: var(--green); }
+  .tag-p1 { background: var(--pink-soft); color: var(--pink); }
+  .tag-abs { background: var(--red-soft); color: var(--red); }
+  .tag-hybrid { background: var(--amber-soft); color: var(--amber); }
+  .tag-llm { background: var(--purple-soft); color: var(--purple); }
+
+  /* ===== FLOW DIAGRAM ===== */
+  .flow {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin: 20px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.85;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* ===== INNOVATION BADGE ===== */
+  .innovation-badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--blue-soft), var(--purple-soft));
+    color: var(--blue);
+    border: 1px solid var(--blue);
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+  }
+
+  /* ===== FINAL VERDICT ===== */
+  .verdict {
+    background: linear-gradient(135deg, #0f1520 0%, #151d2e 50%, #0f1520 100%);
+    border: 1px solid var(--border-strong);
+    color: #fff;
+    border-radius: var(--radius-lg);
+    padding: 48px;
+    text-align: center;
+    margin: 40px 0 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .verdict::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue), var(--purple), var(--green), var(--amber));
+  }
+  .verdict h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 18px;
+  }
+  .verdict p {
+    font-size: 15px;
+    color: var(--ink-3);
+    max-width: 680px;
+    margin: 0 auto;
+    line-height: 1.8;
+  }
+  .verdict .hl { color: var(--ink); font-weight: 600; }
+
+  /* ===== FOOTER ===== */
+  .footer-note {
+    text-align: center;
+    padding: 32px 0 48px;
+    font-size: 11px;
+    color: var(--ink-5);
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.5px;
+    line-height: 1.8;
+  }
+
+  /* ===== TOC ===== */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin: 20px 0;
+  }
+  .toc-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  .toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: toc;
+  }
+  .toc li {
+    counter-increment: toc;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin: 0;
+  }
+  .toc li:last-child { border-bottom: none; }
+  .toc li::before {
+    content: counter(toc, decimal-leading-zero);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--blue);
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 28px;
+  }
+  .toc li a {
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: 14px;
+    flex: 1;
+  }
+  .toc li a:hover { color: var(--blue); }
+  .toc li .toc-sub {
+    color: var(--ink-4);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  /* ===== DEMO SCRIPT BOX ===== */
+  .demo-box {
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin: 22px 0;
+  }
+  .demo-step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .demo-step:last-child { border-bottom: none; }
+  .demo-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--blue);
+    line-height: 1;
+  }
+  .demo-q {
+    font-size: 14.5px;
+    color: var(--ink);
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-style: italic;
+  }
+  .demo-a {
+    font-size: 13px;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+  .demo-a strong { color: var(--ink-2); }
+  .demo-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- COVER -->
+<!-- ============================================================ -->
+<div class="cover">
+  <div class="page cover-inner">
+    <div class="cover-eyebrow">Architecture Brief · rfq_chatbot_ms · v2 F</div>
+    <h1>RFQ Copilot<br><em>grounded, stage-aware, honestly scoped</em></h1>
+    <div class="cover-sub">
+      Why the GHI RFQ Copilot is not a chat window with tools stapled on, but a context-engineered, stage-aware conversational copilot that owns the concerns neither <code>rfq_manager_ms</code> nor <code>rfq_intelligence_ms</code> should own — and honestly surfaces what the platform can and cannot yet know. <em>The product surface is called <strong>RFQ Copilot</strong>; the technical service that delivers it is <code>rfq_chatbot_ms</code>.</em>
+    </div>
+    <div class="cover-meta">
+      <div><strong>Project</strong>RFQMGMT — GHI × Albassam</div>
+      <div><strong>Service</strong>rfq_chatbot_ms</div>
+      <div><strong>Phase</strong>1 — Demo-defensible shell</div>
+      <div><strong>Prepared by</strong>Guidara — BACAB Consulting</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TABLE OF CONTENTS -->
+<!-- ============================================================ -->
+<div class="page">
+  <section style="padding-top: 72px;">
+    <div class="sh">
+      <div class="sh-num">Contents</div>
+      <h2>What this document contains</h2>
+      <p>This brief is the frozen reference for the <code>rfq_chatbot_ms</code> Phase 1 design — the technical microservice that delivers the product surface known as <strong>RFQ Copilot</strong>. It is the primary support artifact for the PFE oral defense and the binding input for the implementation pack and blueprint that will follow.</p>
+    </div>
+
+    <div class="toc">
+      <div class="toc-title">Sections</div>
+      <ol>
+        <li><a href="#s1">The Core Question</a><span class="toc-sub">— what the RFQ Copilot is for, and is not for</span></li>
+        <li><a href="#s2">Constraints That Shaped Every Choice</a><span class="toc-sub">— the ten filters we designed against</span></li>
+        <li><a href="#s3">Architectural Choices</a><span class="toc-sub">— the one-slide freeze</span></li>
+        <li><a href="#s4">The Two Modes — RFQ Copilot and Global Copilot</a><span class="toc-sub">— one brain, two surfaces, many scoped conversations</span></li>
+        <li><a href="#s5">Pillar 1 — Stage-Aware Workflow-Constrained Copilot</a><span class="toc-sub">— innovation #1, grounded in manager-native workflows</span></li>
+        <li><a href="#s6">Pillar 2 — Grounded Generation with Provenance</a><span class="toc-sub">— innovation #2, with the knowledge-boundary rule</span></li>
+        <li><a href="#s7">Pillar 3 — Role-Aware, Access-Aware Answer Generation</a><span class="toc-sub">— innovation #3, over the current IAM seam</span></li>
+        <li><a href="#s8">Pillar 4 — Confidence-Aware Graceful Degradation</a><span class="toc-sub">— innovation #4</span></li>
+        <li><a href="#s9">The Supporting Stack</a><span class="toc-sub">— context engineering, memory, retrieval, tools, disambiguation, guardrails, evaluation</span></li>
+        <li><a href="#s10">Internal Structure (BACAB Layered)</a><span class="toc-sub">— how the service is organized in code</span></li>
+        <li><a href="#s11">Decision Log</a><span class="toc-sub">— the choices, the rejected alternatives, the reasoning</span></li>
+        <li><a href="#s12">Scope &amp; Future Work</a><span class="toc-sub">— what Phase 1 ships, what Phase 2+ inherits</span></li>
+        <li><a href="#s13">Defense Demo Script</a><span class="toc-sub">— the four-beat walk that shows all four pillars</span></li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S1 — THE CORE QUESTION -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s1">
+    <div class="sh">
+      <div class="sh-num">Section 01</div>
+      <h2>The Core Question</h2>
+      <p>Every architecture brief starts by stating what the thing <em>is for</em>. This one starts by stating what it is <em>not</em>.</p>
+    </div>
+
+    <div class="core-question">
+      <div class="label">The question is not "is the copilot smart?"</div>
+      <div class="question">Who owns the conversation layer of the platform — and what concerns actually live there?</div>
+      <div class="answer">
+        The naive answer: the copilot is a chat window on top of intelligence. Paste Azure OpenAI in front of the parsers, write a system prompt, let the LLM pick tools, call it done. That is roughly BACAB's current real-estate chatbot pattern, and it is <strong>exactly the wrong default</strong> for a high-stakes industrial RFQ platform.<br><br>
+        The honest answer: the copilot is the <strong>conversational adapter</strong> that owns a set of concerns nobody else in the platform should own — session state, intent detection, RFQ context resolution, stage awareness, role awareness, provenance injection, guardrails, graceful degradation, and proactive behavior. It orchestrates calls to <code>rfq_manager_ms</code> for operational facts and <code>rfq_intelligence_ms</code> for derived insight, but it is neither of those. It is the surface through which humans interrogate and explore the platform.
+      </div>
+    </div>
+
+    <h3>Naming — product surface vs. technical service</h3>
+    <div class="callout">
+      <span class="tag">Freeze</span>
+      <p>The product surface visible to users and stakeholders is called <strong>RFQ Copilot</strong>. The technical microservice that delivers it is <code>rfq_chatbot_ms</code>. Throughout this brief, product-facing prose uses <em>RFQ Copilot</em> (or simply <em>the copilot</em>), while engineering-facing prose — file paths, service identifiers, the BACAB layered structure — uses <code>rfq_chatbot_ms</code>. This is a deliberate separation: the product naming can evolve without requiring a technical migration, and the technical identity is stable for deployment, DNS, Docker Compose, and the rest of the platform.</p>
+    </div>
+
+    <h3>One-sentence definition</h3>
+    <div class="callout purple">
+      <span class="tag">Freeze</span>
+      <p><strong>RFQ Copilot</strong> (technically <code>rfq_chatbot_ms</code>) is a <strong>stage-aware, role-aware, provenance-grounded conversational copilot</strong> that operates in two modes — embedded RFQ copilot and global portfolio copilot — orchestrates calls to <code>rfq_manager_ms</code> and <code>rfq_intelligence_ms</code>, owns the conversation-layer concerns neither of those services should own, and degrades gracefully when intelligence is partial or absent.</p>
+    </div>
+
+    <h3>What the copilot is <em>not</em></h3>
+    <ul>
+      <li><strong>Not a reimplementation of BACAB's real-estate chatbot pattern.</strong> That pattern is LLM-as-orchestrator with free tool-calling. It works when wrong answers are cheap (a user scrolls past a mismatched apartment). In an Aramco pressure-vessel bid, a wrong cost estimate is real money. The architectural posture is different.</li>
+      <li><strong>Not the owner of intelligence.</strong> Intelligence lives in <code>rfq_intelligence_ms</code>, a shared service (see D-07). The copilot is one consumer among several. It must not duplicate, mirror, or hide intelligence behind a conversational wall.</li>
+      <li><strong>Not a state-mutating agent (in Phase 1).</strong> Phase 1 is read-only by design. All state changes — saving scenarios, updating fields, sending communications — are Phase 2 work, gated by explicit human-in-the-loop confirmation when they arrive.</li>
+      <li><strong>Not a multi-agent system.</strong> There is one copilot, not many. Alternatives like "one agent per RFQ" or "specialized sub-agents coordinating via A2A" were considered and rejected for Phase 1 on coordination-cost and architectural-waste grounds (see §11 Decision Log). <strong>One brain, two modes, many scoped conversations.</strong></li>
+      <li><strong>Not an autonomous "AI agent" of the generalized Web3-era sense.</strong> It is a workflow-constrained copilot with explicit boundaries, explicit provenance, and explicit confidence. The word "agent" in the 2026 literature now means many things; the RFQ Copilot is specifically a <em>workflow-constrained copilot</em> in the lineage of CoALA (Sumers et al. 2024) and production state-machine agent patterns.</li>
+    </ul>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S2 — CONSTRAINTS -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s2">
+    <div class="sh">
+      <div class="sh-num">Section 02</div>
+      <h2>Constraints That Shaped Every Choice</h2>
+      <p>Ten filters. Every architectural decision in this brief survives all ten. Anything that does not survive them is out of scope — no matter how fashionable it is in the 2026 literature.</p>
+    </div>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:60px;">ID</th>
+          <th style="width:220px;">Filter</th>
+          <th>What it means for design decisions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>C1</strong></td><td><strong>Time budget</strong></td><td>Finite window before PFE defense. Anything beyond ~2-3 weeks of focused copilot work is out. Anything shippable but not defensible in depth is worse than not shipping it.</td></tr>
+        <tr><td><strong>C2</strong></td><td><strong>Azure OpenAI mandated</strong></td><td>BACAB requirement, non-negotiable. Shapes available capabilities (structured outputs, function calling, prompt caching, content safety) and rules out fine-tuning, model swapping, and self-hosted alternatives.</td></tr>
+        <tr><td><strong>C3</strong></td><td><strong>Cold-start data reality</strong></td><td>One golden workbook (<code>IF-25144.xls</code>), one golden MR package (<code>SA-AYPP-6-MR-022</code>). Any technique requiring a historical corpus — benchmarking, similarity search, preference learning, memory consolidation — cannot be honestly validated and is deferred.</td></tr>
+        <tr><td><strong>C4</strong></td><td><strong>Do not touch <code>rfq_manager_ms</code></strong></td><td>Manager is V1-frozen. The copilot consumes its existing API contract and works around absences in the copilot layer, not by adding endpoints to manager.</td></tr>
+        <tr><td><strong>C5</strong></td><td><strong>Intelligence is partial</strong></td><td>Workbook parser frozen, MR package parser specced, known bugs exist. The copilot must gracefully handle "I do not have that insight yet" as a first-class case, not an error.</td></tr>
+        <tr><td><strong>C6</strong></td><td><strong>Two audiences</strong></td><td>Academic jury wants named techniques, cited patterns, explicit trade-offs, honest scoping. BACAB wants reusability, clean architecture, business value, a path from Phase 1 to Phase 2. Every decision must serve both.</td></tr>
+        <tr><td><strong>C7</strong></td><td><strong>BACAB layered architecture</strong></td><td><code>routes → controllers → datasources/connectors</code>. The copilot lives inside this pattern, not around it. Agent frameworks that own the request lifecycle are fighting the house style.</td></tr>
+        <tr><td><strong>C8</strong></td><td><strong>Phase 1 = demo shell, not production</strong></td><td>Build thin but honest now; flag the rest as future work. "Build it fully or not at all" is out of scope. "Design the path, build the demo" is in scope.</td></tr>
+        <tr><td><strong>C9</strong></td><td><strong>Solo engineer</strong></td><td>No team. Every hour on the copilot is an hour not spent on intelligence bug fixes, demo polish, thesis writing, defense rehearsal. Opportunity cost is real and accounted for.</td></tr>
+        <tr><td><strong>C10</strong></td><td><strong>Infrastructure reality</strong></td><td>Azure Blob Storage, PostgreSQL, Docker Compose. No Kubernetes, no exotic vector stores, no new databases. Anything requiring infrastructure the platform does not already have is a hidden cost.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="tag">Design discipline</span>
+      <p>These filters are not excuses. They are the constraints a real engineer works within, and the discipline of honoring them is itself part of the thesis contribution. A PFE that claims more than its constraints allow is weaker than one that claims less and defends every claim.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S3 — ARCHITECTURAL CHOICES SLIDE -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s3">
+    <div class="sh">
+      <div class="sh-num">Section 03</div>
+      <h2>Architectural Choices — The One-Slide Freeze</h2>
+      <p>Fifteen lines. Every line is defensible in one sentence. Every line maps to something concrete in the Phase 1 build. This is the slide that goes in the defense deck.</p>
+    </div>
+
+    <div class="choices-table">
+      <div class="row"><div class="k">Discipline</div><div class="v"><strong>Context engineering</strong> — the context window is a managed resource; every prompt is assembled from stable and variable pieces under explicit token budgets.</div></div>
+      <div class="row"><div class="k">Agent pattern</div><div class="v"><strong>State-machine / workflow-constrained copilot</strong> — available tools, context, and allowable intents are conditioned on the current RFQ stage, read authoritatively from <code>rfq_manager_ms</code> workflows and live <code>rfq_stage</code> records.</div></div>
+      <div class="row"><div class="k">Tool interface</div><div class="v"><strong>MCP-shaped function calling</strong> (Azure OpenAI native). Phase 2: native MCP servers once enterprise OAuth 2.1 auth matures on the MCP roadmap.</div></div>
+      <div class="row"><div class="k">Operating modes</div><div class="v"><strong>Two modes, one service:</strong> <em>RFQ Copilot</em> (embedded in a specific RFQ, session isolated per <code>(user, rfq_id)</code>) and <em>Global Copilot</em> (portfolio-level questions, resolves to specific RFQs via disambiguation). One brain, many scoped conversations.</div></div>
+      <div class="row"><div class="k">Role model</div><div class="v"><strong>Role-aware / access-aware answer generation</strong>. The same factual question returns different answers for different roles, driven by identity resolved through the current IAM seam (shared with <code>rfq_manager_ms</code>), formalized behind a future <code>rfq_iam_ms</code> service boundary.</div></div>
+      <div class="row"><div class="k">Memory</div><div class="v"><strong>Working + episodic</strong> in Phase 1. Semantic and procedural memory are future work, gated on real usage data accumulation.</div></div>
+      <div class="row"><div class="k">Retrieval</div><div class="v"><strong>Structured-first</strong>. Document RAG is scoped to MR package documents only. Structured data flows through typed API calls, not embeddings.</div></div>
+      <div class="row"><div class="k">Grounding</div><div class="v">Every factual claim carries a <code>source_ref</code> traceable back to a deterministic parser or typed API result.</div></div>
+      <div class="row"><div class="k">Confidence</div><div class="v">Every tool result carries <code>confidence</code> and <code>validated_against</code> metadata. The copilot's response is explicitly conditioned on these values.</div></div>
+      <div class="row"><div class="k">Safety posture</div><div class="v"><strong>HOOTL</strong> (read) / <strong>HOTL</strong> (what-if) / <strong>HITL</strong> (mutations, Phase 2). Action type determines the human-in-the-loop tier.</div></div>
+      <div class="row"><div class="k">Graceful degradation</div><div class="v">Explicit absence, explicit uncertainty, and <strong>named future-capability conditions</strong>. The copilot never guesses; it surfaces gaps honestly.</div></div>
+      <div class="row"><div class="k">Determinism</div><div class="v">Structured outputs + intent classification + Pydantic validation. Free-form generation is reserved for the narration layer.</div></div>
+      <div class="row"><div class="k">Evaluation</div><div class="v">Golden-set evaluation suite covering tool selection, grounding, and confidence behavior. Run in CI on every build.</div></div>
+      <div class="row"><div class="k">Cold-start</div><div class="v">Validated against 1 sample. The limitation is surfaced honestly in every turn, not hidden behind confident-sounding prose.</div></div>
+      <div class="row opt-row"><div class="k">Optimization</div><div class="v">Stable-prefix prompt layout (enables Azure OpenAI automatic caching).</div></div>
+    </div>
+
+    <h3>How to read this slide</h3>
+    <p>The first column is the <em>dimension</em>. The second column is the <em>choice</em>. Every choice has a one-paragraph justification in the corresponding pillar or supporting-stack section below. Nothing on this slide is aspirational; every line corresponds to something that ships in Phase 1 (except Phase-2 markers explicitly labeled as such).</p>
+
+    <div class="callout green">
+      <span class="tag">Reading order</span>
+      <p>The first four pillars (sections 05–08) are the <strong>innovations</strong> — the architectural choices that are load-bearing for the thesis contribution. The supporting stack (section 09) covers the rest of the slide as engineering infrastructure. The internal structure (section 10) shows how it all maps to BACAB's layered pattern in code.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S4 — THE TWO MODES -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s4">
+    <div class="sh">
+      <div class="sh-num">Section 04</div>
+      <h2>The Two Modes — RFQ Copilot and Global Copilot</h2>
+      <p>Before introducing the four pillars, we need to describe the shape of the product. The RFQ Copilot operates in two conversational modes, backed by one service and one brain. This section is the architectural contract that shapes every other decision in this brief.</p>
+    </div>
+
+    <div class="core-question">
+      <div class="label">The product shape</div>
+      <div class="question">One copilot, two modes, many scoped conversations.</div>
+      <div class="answer">
+        There is exactly one copilot service (<code>rfq_chatbot_ms</code>). There is exactly one conversation engine. What differs between modes is the <strong>entry context</strong>, the <strong>tool surface</strong>, the <strong>allowable question scope</strong>, and the <strong>default data the copilot operates on</strong> — not the underlying architecture. Alternatives like "one agent per RFQ," "one agent per dashboard," or "separate microservices per surface" were considered and rejected: they create coordination cost, context drift, and architectural waste with no benefit that cannot be achieved through clean scoping within a single service.
+      </div>
+    </div>
+
+    <h3>4.1 Mode A — RFQ Copilot (embedded, primary mode)</h3>
+    <div class="pillar p1">
+      <div class="pillar-header">
+        <span class="pillar-num">Mode A</span>
+        <h3>RFQ Copilot</h3>
+      </div>
+      <div class="one-liner">The copilot is opened from within a specific RFQ in the UI, already attached to that RFQ's context. Every conversation in this mode is RFQ-scoped: session memory is isolated per <code>(user_id, rfq_id)</code> pair, and no cross-pollination with other RFQs ever happens.</div>
+
+      <h4>Entry and binding</h4>
+      <p>Triggered from the RFQ detail page in <code>rfq_ui_ms</code>. The frontend opens a copilot panel and passes an explicit <code>rfq_id</code> in the session creation request. The copilot binds that <code>rfq_id</code> to the session at creation time; the binding is immutable for the lifetime of that session. If the user wants to talk about a different RFQ, they navigate to it and open a new conversation.</p>
+
+      <h4>Default context</h4>
+      <p>Because the <code>rfq_id</code> is known at session creation, the copilot pre-loads a lightweight RFQ snapshot on the first turn — fetched via <code>get_rfq_snapshot(rfq_id)</code> from <code>rfq_intelligence_ms</code>, which returns the consumer-facing read model already assembled by the intelligence service. The snapshot is the default context for every turn in the conversation; the copilot does not need to re-resolve which RFQ the user means.</p>
+
+      <h4>Allowed questions</h4>
+      <ul>
+        <li><strong>RFQ-specific factual queries</strong> — stage, workbook totals, BOQ items, parsed values, package identity.</li>
+        <li><strong>RFQ-specific analytical queries</strong> — "what's missing from the BOQ?", "are the standards compliant with Aramco SAES-D-001?", "what's the margin trend on this cost breakdown?"</li>
+        <li><strong>General engineering explanations</strong> — "what is ASME Section VIII?", "what does PWHT mean?" (subject to the knowledge boundary rule in §6 Pillar 2).</li>
+        <li><strong>Stage-appropriate what-if exploration</strong> (Priority 2, stretch scope — see §12).</li>
+      </ul>
+
+      <h4>Tool surface</h4>
+      <p>The full RFQ-scoped tool set: <code>get_rfq_snapshot</code>, <code>get_intelligence_briefing</code>, <code>get_workbook_review</code>, <code>get_workbook_profile</code>, <code>get_rfq_profile</code>, <code>get_rfq_stage</code>, <code>search_mr_documents</code>, <code>get_capability_status</code>. Portfolio-level tools (stats, analytics, cross-RFQ queries) are <strong>not exposed</strong> in this mode, because they would be out of the conversation's explicit scope.</p>
+    </div>
+
+    <h3>4.2 Mode B — Global Copilot (portfolio, secondary mode)</h3>
+    <div class="pillar p3">
+      <div class="pillar-header">
+        <span class="pillar-num">Mode B</span>
+        <h3>Global / Portfolio Copilot</h3>
+      </div>
+      <div class="one-liner">The copilot is opened from a portfolio surface — RFQ queue, executive dashboard, overview page. It answers cross-RFQ and portfolio-level questions, and can pivot into a specific RFQ via disambiguation when the conversation narrows.</div>
+
+      <h4>Entry and binding</h4>
+      <p>Triggered from non-RFQ-scoped surfaces in <code>rfq_ui_ms</code>: the RFQ queue page, the executive dashboard, the overview. No <code>rfq_id</code> is bound at session creation time. The session starts in <em>portfolio</em> state. It may transition to <em>RFQ-bound</em> state later in the conversation if the user narrows to a specific RFQ — at which point the tool surface and allowed questions shift to match.</p>
+
+      <h4>Default context</h4>
+      <p>The default context is portfolio metadata read from <code>rfq_manager_ms</code>'s stats and analytics endpoints (<code>/rfqs/stats</code>, <code>/rfqs/analytics</code>, and the RFQ list with filters). The copilot does not pre-load any single RFQ's snapshot, because the conversation may be about many RFQs at once.</p>
+
+      <h4>Allowed questions</h4>
+      <ul>
+        <li><strong>Portfolio questions</strong> — "which RFQs are blocked?", "which are near deadline?", "which client has the most active RFQs?", "which should I look at first?"</li>
+        <li><strong>Cross-RFQ comparison</strong> — "how does RFQ IF-25144 compare to our other pressure-vessel jobs?" (limited by cold-start data reality — see §8 Pillar 4).</li>
+        <li><strong>RFQ resolution by name</strong> — "show me RFQ IF-25144" or "what stage is the Aramco vessel RFQ in?" Handled via disambiguation (§9.5).</li>
+        <li><strong>General engineering explanations</strong> — same knowledge boundary as RFQ mode.</li>
+      </ul>
+
+      <h4>Tool surface</h4>
+      <p>Portfolio-focused tools are primary: <code>list_rfqs</code>, <code>get_rfq_stats</code>, <code>get_rfq_analytics</code>, <code>resolve_rfq_by_name</code>. When the conversation pivots into a specific RFQ, the RFQ-scoped tools become available as well, exactly as in Mode A.</p>
+
+      <h4>The pivot — Global → RFQ-bound</h4>
+      <div class="callout">
+        <span class="tag">State transition</span>
+        <p>When a global-mode conversation narrows to a specific RFQ (e.g., "tell me more about IF-25144"), the session transitions from <em>portfolio</em> to <em>rfq_bound</em> state. The <code>rfq_id</code> is set on the session, the RFQ snapshot is loaded, and subsequent turns behave as if the conversation had started in RFQ Copilot mode. <strong>The transition is one-way within a single conversation:</strong> once a conversation is bound to an RFQ, it cannot unbind back to portfolio scope — the user would start a new conversation to return to portfolio mode. This is a deliberate simplification to keep session state predictable and auditable.</p>
+      </div>
+    </div>
+
+    <h3>4.3 What both modes share</h3>
+    <p>Everything that matters for reliability, safety, and honesty is identical across the two modes. The four pillars (§5–§8) apply to both. The grounding guardrail, the confidence-aware rendering, the role-aware generation, the stage-aware behavior — all shared. The supporting stack (§9) is shared. The BACAB layered structure (§10) is a single codebase. There is no duplicated logic between modes.</p>
+
+    <h3>4.4 What both modes do <em>not</em> share</h3>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:220px;">Dimension</th>
+          <th>RFQ Copilot (Mode A)</th>
+          <th>Global Copilot (Mode B)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Session binding</strong></td>
+          <td><code>(user_id, rfq_id)</code> fixed at creation</td>
+          <td><code>(user_id, rfq_id=null)</code> initially, optional pivot to <code>rfq_bound</code></td>
+        </tr>
+        <tr>
+          <td><strong>Default context loaded</strong></td>
+          <td>RFQ snapshot (intelligence) + stage (manager)</td>
+          <td>Portfolio metadata (manager stats/analytics)</td>
+        </tr>
+        <tr>
+          <td><strong>Primary tool surface</strong></td>
+          <td>RFQ-scoped tools (snapshot, briefing, workbook, documents, stage)</td>
+          <td>Portfolio tools (list, stats, analytics, resolve) + RFQ-scoped after pivot</td>
+        </tr>
+        <tr>
+          <td><strong>Allowed intent categories</strong></td>
+          <td>rfq_factual, rfq_analytical, rfq_what_if, general_knowledge</td>
+          <td>portfolio, rfq_resolution, rfq_factual (post-pivot), general_knowledge</td>
+        </tr>
+        <tr>
+          <td><strong>RFQ resolution needed?</strong></td>
+          <td>No — bound at creation</td>
+          <td>Yes — via disambiguation (§9)</td>
+        </tr>
+        <tr>
+          <td><strong>Stage-aware gating</strong></td>
+          <td>Yes, from turn 1</td>
+          <td>Only after pivot into <code>rfq_bound</code> state</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>4.5 Why not separate services?</h3>
+    <div class="comp-box">
+      <div class="comp-side comp-rejected">
+        <span class="comp-label">Rejected — one service per surface</span>
+        <p><strong>Approach:</strong> ship <code>rfq_copilot_embedded_ms</code> for the in-RFQ panel and <code>rfq_copilot_portfolio_ms</code> for the dashboard. Each with its own tool set, prompts, and deployment.</p>
+        <p><strong>Why rejected:</strong> duplicates the entire conversation engine, the guardrail stack, the context builder, the memory layer, the evaluation harness. Every bug fix and every new pillar improvement has to be made twice. Coordination cost is paid forever in exchange for no architectural benefit that cannot be achieved through mode-based scoping within one service.</p>
+      </div>
+      <div class="comp-side comp-chosen">
+        <span class="comp-label">✓ Chosen — one service, two modes</span>
+        <p><strong>Approach:</strong> <code>rfq_chatbot_ms</code> exposes both surfaces. A <code>session_mode</code> field on the session record indicates <code>rfq_bound</code>, <code>portfolio</code>, or <code>pending_pivot</code>. Routes are distinguished by entry endpoint but flow through the same controllers, context builder, and tool layer.</p>
+        <p><strong>Gain:</strong> one codebase, one eval suite, one deployment, one telemetry surface. The mode distinction is a runtime parameter, not a deployment boundary. This is the same philosophy as the manager's single service handling both the UI read path and the event-driven write path.</p>
+      </div>
+    </div>
+
+    <h3>4.6 What this does <em>not</em> mean</h3>
+    <p>A few important non-implications worth stating clearly, because they are easy to misread:</p>
+    <ul>
+      <li><strong>This is not multi-agent.</strong> There are no sub-agents, no orchestrator, no A2A protocol. There is one Azure OpenAI call path per turn. The "two modes" are a property of sessions, not a property of agent topologies.</li>
+      <li><strong>This is not HITL on RFQ resolution.</strong> When the user says "show me the Aramco vessel RFQ," the copilot resolves via search-and-disambiguate (§9 new subsection). HITL is only for state-changing actions, not for understanding what the user meant.</li>
+      <li><strong>This is not stage-agnostic.</strong> Once a conversation is RFQ-bound (either from the start in Mode A, or after a pivot in Mode B), Pillar 1 (§5) applies fully: the current RFQ's manager-native stage drives tool availability and context framing.</li>
+      <li><strong>This is not two memory stores.</strong> Episodic memory is one table, scoped by <code>(conversation_id, user_id, rfq_id?)</code>. Portfolio sessions have <code>rfq_id=null</code>; RFQ-bound sessions have a value. One schema, one datasource, one retrieval path.</li>
+    </ul>
+
+    <div class="callout purple">
+      <span class="tag">Defense paragraph</span>
+      <p>The RFQ Copilot operates in two modes — an embedded RFQ copilot bound to a specific RFQ at session creation, and a global portfolio copilot that answers cross-RFQ questions and resolves to specific RFQs via disambiguation when the conversation narrows. Both modes are served by a single microservice (<code>rfq_chatbot_ms</code>) with a single conversation engine, a single eval suite, and a single BACAB-layered codebase. What differs between modes is entry context, default tool surface, and allowed intent categories — not the underlying architecture. This is a deliberate simplification over alternatives like one-agent-per-RFQ or separate-service-per-surface, both of which would multiply coordination cost without architectural benefit.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S5 — PILLAR 1: STAGE-AWARE COPILOT -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s5">
+    <div class="sh">
+      <div class="sh-num">Section 05 · Pillar 1</div>
+      <h2>Stage-Aware Workflow-Constrained Copilot <span class="innovation-badge">Innovation 01</span></h2>
+      <p>What the agent <em>does</em> is constrained by where the RFQ is in its lifecycle. This is the first of four pillars and the one that most clearly differentiates the copilot from the LLM-as-orchestrator pattern.</p>
+    </div>
+
+    <div class="pillar p1">
+      <div class="pillar-header">
+        <span class="pillar-num">Pillar 01</span>
+        <h3>Stage-Aware Conversation</h3>
+      </div>
+      <div class="one-liner">The copilot knows which RFQ lifecycle stage is active and adapts its available tools, its retrieved context, and its allowable questions accordingly.</div>
+
+      <h4>The Problem</h4>
+      <p>In an LLM-as-orchestrator pattern, the agent has full access to every tool on every turn. The LLM decides, from raw prompt-and-history context, what to do. This works for low-stakes domains where wrong actions are cheap. It fails in two specific ways for high-stakes industrial RFQs:</p>
+      <ul>
+        <li><strong>Stage-inappropriate actions.</strong> A user asks "when did we submit this?" for an RFQ that is still in the intake stage. The LLM, seeing a <code>get_submission_date</code> tool in its tool list, calls it, gets nothing useful, and either hallucinates a date or produces an awkward non-answer. Neither is acceptable.</li>
+        <li><strong>Unbounded tool surface.</strong> The LLM has no principled way to know that certain questions only make sense in certain stages. The prompt becomes a wall of conditional instructions the LLM must hold in working memory on every turn, and Chroma's 2025 study (the "context rot" paper) shows exactly what happens when prompts grow: accuracy falls.</li>
+      </ul>
+
+      <h4>The Pattern — Workflow-Constrained Agent</h4>
+      <p>The copilot implements a pattern that is variously called <em>state-machine agent</em>, <em>workflow-constrained agent</em>, or <em>finite-state dialog policy over LLMs</em>. The pattern was popularized in production systems by LangGraph in 2024–2025 and has academic roots in Sumers et al.'s <strong>CoALA — Cognitive Architectures for Language Agents</strong> (TMLR 2024).</p>
+      <p>The core idea: you trade some flexibility for massive reliability and explainability gains by conditioning the agent's available actions on an explicit state machine. In our case, the state machine is the RFQ lifecycle itself.</p>
+
+      <h4>How It Works Concretely</h4>
+      <div class="flow">Stage truth comes from <span class="n">rfq_manager_ms</span>, not from an abstract enum.
+
+The authoritative vocabulary lives in manager's schema:
+
+  <span class="n">workflow</span>          ← reusable workflow template (e.g., "Aramco PV standard flow")
+  <span class="n">stage_template</span>    ← stage definitions within a workflow
+  <span class="n">rfq_stage</span>         ← live stage instances per RFQ, with progression state
+
+The copilot fetches the current <span class="n">rfq_stage</span> for the bound RFQ via:
+
+  GET /rfqs/{rfq_id}/stages   (from <span class="n">rfq_manager_ms</span>)
+
+This returns the actual stage records (not an enum), including the active stage's
+template metadata, captured field values, progression timestamps, and subtasks.
+
+Stage-specific copilot configuration is keyed on the <span class="s">stage_template</span> identifier:
+
+  stage_config = {
+    "<span class="s">stage_template_id:intake_parsing</span>": {
+        allowed_intents: [...],
+        relevant_tools: [...],
+        stage_framing: "..."
+    },
+    "<span class="s">stage_template_id:technical_review</span>": {
+        allowed_intents: [...],
+        relevant_tools: [...],
+        stage_framing: "..."
+    },
+    ...
+  }
+
+On every turn (for RFQ-bound conversations):
+
+  1. Fetch current live stage from manager via <span class="n">get_rfq_stage(rfq_id)</span>.
+  2. Read the active stage_template identifier from the response.
+  3. Look up stage-specific copilot config by template identifier.
+  4. <span class="n">ContextBuilder</span> uses <span class="s">stage_framing</span> text in the system prompt.
+  5. Tool layer exposes only <span class="s">relevant_tools</span> for this stage.
+  6. Intent classifier validates the user's intent against <span class="s">allowed_intents</span>.
+  7. If intent is out of stage → graceful redirect, not awkward failure.
+
+<span class="c">Key point: the state machine IS the manager workflow. The copilot does not</span>
+<span class="c">invent stages. It reads them. Workflows are configurable in manager; the copilot</span>
+<span class="c">adapts automatically as long as the stage_template identifiers are present in</span>
+<span class="c">the copilot's stage_config map.</span></div>
+
+      <h4>Example — the same question, two stages</h4>
+      <p>Consider a user asking <em>"what's missing from the BOQ?"</em> on an RFQ whose workflow includes an <code>intake_parsing</code> stage and a later <code>submission</code> stage:</p>
+      <ul>
+        <li><strong>Active stage = intake_parsing</strong>: perfectly valid. The copilot calls <code>get_workbook_review(rfq_id)</code> on intelligence, receives the workbook review report comparing intake vs workbook completeness, and renders missing or low-confidence items with source references.</li>
+        <li><strong>Active stage = submission</strong>: no longer a productive question — the bid is already out. The copilot redirects: "This RFQ has been submitted. The workbook review from the estimation phase is archived and available, but any revisions now would require a change request. Would you like to review the archived workbook review, or check the submission status?"</li>
+      </ul>
+      <p>Notice what the copilot did <em>not</em> do: it did not call the tool and produce a stale answer. It did not refuse the question. It offered stage-appropriate alternatives. This is the gain of workflow constraint — and notice that the stage names (<code>intake_parsing</code>, <code>submission</code>) are illustrative placeholders. The actual stage identifiers come from whatever workflow template is configured in manager for that RFQ class. The copilot adapts as manager's workflow templates evolve, without code changes — only a configuration update to <code>stage_config</code>.</p>
+
+      <h4>Optional: conversational buckets</h4>
+      <p>For UX framing and reasoning purposes, the copilot may optionally maintain a mapping from the manager-native stage templates to broader <em>conversational buckets</em> — higher-level groupings like "pre-bid," "in-review," "post-submission." These are never authoritative; they are narrative shorthand used only in the copilot's system prompt for framing and in user-facing phrasing. Manager's <code>rfq_stage</code> remains the single source of truth. This mapping is a simple dict in <code>config/stage_config.py</code> and is completely optional — the copilot works fine without it.</p>
+
+      <h4>Why Plain Python and Not LangGraph</h4>
+      <div class="comp-box">
+        <div class="comp-side comp-rejected">
+          <span class="comp-label">Rejected for this service, this phase — LangGraph framework</span>
+          <p><strong>Why rejected:</strong> not because LangGraph is an invalid pattern — it is genuinely the dominant production framework for state-machine agents in 2025–2026, and BACAB may legitimately adopt it for other services where the orchestration complexity demands it. Rejected here because this copilot's required workflow control is <em>small and explicit</em>: the state machine has one dimension (manager-native stage templates), one trigger (every turn), and one action (reconfigure tool surface + prompt framing). That complexity is naturally expressible in BACAB's controller-centric architecture without importing a graph framework.</p>
+          <p><strong>Also considered and rejected:</strong> LangChain (superset framework with broader scope), LangSmith (tracing and eval tooling), Langflow (visual builder). All three are fine tools; none of them pays for itself against the solo-engineer time budget and the simplicity of the orchestration this service actually needs.</p>
+        </div>
+        <div class="comp-side comp-chosen">
+          <span class="comp-label">✓ Chosen — Plain Python state machine in controllers</span>
+          <p><strong>Approach:</strong> a module <code>controllers/stage_controller.py</code> holds the stage-template → config dictionary and the resolution logic. Every RFQ-bound request flows through it. Pure functions, no framework magic, trivially testable, fast to explain in the defense.</p>
+          <p><strong>Trade-off honestly owned:</strong> we cite LangGraph and CoALA (Sumers et al. 2024) in the thesis as the <em>academic and industry patterns we are aligned with</em>, and we explain why a plain-Python implementation is cheaper to test, explain, and maintain for this service in this phase. If orchestration complexity grows meaningfully in Phase 2 — parallel branches, retry graphs, compensating actions — LangGraph becomes a reasonable migration target. For Phase 1, it would be complexity debt without return.</p>
+        </div>
+      </div>
+
+      <h4>What ships in Phase 1</h4>
+      <ul>
+        <li><code>controllers/stage_controller.py</code> with the resolution logic that reads <code>rfq_stage</code> from manager and looks up the matching copilot config.</li>
+        <li><code>config/stage_config.py</code> — a static Python dict keyed on manager's <code>stage_template</code> identifiers, with <code>allowed_intents</code>, <code>relevant_tools</code>, and <code>stage_framing</code> for each.</li>
+        <li>Coverage for the stage templates that appear in the demo RFQ's workflow — typically 3–5 templates, determined by what manager's seed data creates for the <code>IF-25144</code> golden sample.</li>
+        <li>Integration with <code>ContextBuilder</code> — stage framing is injected into the stable prefix of the system prompt.</li>
+        <li>Integration with the tool layer — only stage-relevant tools are exposed to Azure OpenAI on each turn.</li>
+        <li>Integration with intent classification — out-of-stage intents trigger graceful redirects.</li>
+        <li>Golden-set cases that verify stage-appropriate behavior on at least 3 different stage templates (same RFQ, different points in its lifecycle).</li>
+        <li>Handling for Global Copilot (Mode B) sessions that are not yet RFQ-bound — no stage gating applies until the pivot.</li>
+      </ul>
+
+      <h4>Thesis-Defensible Framing</h4>
+      <div class="callout purple">
+        <span class="tag">Defense paragraph</span>
+        <p>We implement a <strong>workflow-constrained agent pattern</strong> (cf. LangGraph production patterns; Sumers et al. 2024, <em>Cognitive Architectures for Language Agents</em>, TMLR) in which the agent's available actions and context are conditioned on the <em>manager-native workflow state</em>. The state machine is not an invention of the copilot — it is a direct read of <code>rfq_manager_ms</code>'s <code>workflow</code> / <code>stage_template</code> / <code>rfq_stage</code> schema, via the existing REST API. Copilot behavior is configured per stage template, not per abstract enum label, so it adapts automatically as manager's workflows evolve. This provides reliability, auditability, and explainability gains over pure LLM-as-orchestrator patterns — at the cost of some flexibility — a trade-off we justify by the high-stakes nature of pressure vessel bid management at GHI, where the downside of wrong action substantially exceeds the upside of conversational flexibility.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S6 — PILLAR 2: GROUNDED GENERATION -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s6">
+    <div class="sh">
+      <div class="sh-num">Section 06 · Pillar 2</div>
+      <h2>Grounded Generation with Provenance <span class="innovation-badge">Innovation 02</span></h2>
+      <p>What the agent <em>says</em> is constrained by what it can point to. Every factual claim carries a source reference back to a deterministic parser output or a typed API result.</p>
+    </div>
+
+    <div class="pillar p2">
+      <div class="pillar-header">
+        <span class="pillar-num">Pillar 02</span>
+        <h3>Grounded Generation with Provenance</h3>
+      </div>
+      <div class="one-liner">Every numeric or factual claim in the copilot's output carries a <code>source_ref</code> pointing to its origin. Claims without a source are rejected by an output guardrail and retried.</div>
+
+      <h4>The Problem — Hallucination in a High-Stakes Domain</h4>
+      <p>LLMs hallucinate. This is not a bug to be fixed with a better model; it is a structural property of generative probabilistic systems. In low-stakes domains (recommending a restaurant, explaining a concept) a 2% hallucination rate is tolerable. In an Aramco pressure-vessel bid with six-figure sums moving on numeric facts, it is not.</p>
+      <p>The anti-hallucination strategy that actually works in production in 2025–2026 is <strong>grounded generation</strong> (also called <em>attributed QA</em>): force every factual claim to carry a pointer to its source, and reject claims that don't. The copilot becomes, in effect, a <em>lookup with narration</em> rather than "an LLM that might be right."</p>
+
+      <h4>The Data Shape — Tool Result Envelopes</h4>
+      <p>Every tool in the copilot returns a structured envelope, not a bare value. The envelope is a frozen contract across all tools:</p>
+      <pre><span class="c"># tools/common/envelope.py</span>
+<span class="k">class</span> <span class="n">ToolResultEnvelope</span>(<span class="n">BaseModel</span>):
+    value: <span class="n">Any</span>                              <span class="c"># the actual payload</span>
+    source_ref: <span class="n">SourceRef</span>                    <span class="c"># where it came from</span>
+    confidence: <span class="n">ConfidenceLevel</span>              <span class="c"># deterministic | pattern_1_sample | absent</span>
+    validated_against: <span class="n">Optional</span>[<span class="n">str</span>]         <span class="c"># "1_sample" | "multi_sample" | None</span>
+    retrieved_at: <span class="n">datetime</span>                   <span class="c"># when the tool ran</span>
+
+<span class="k">class</span> <span class="n">SourceRef</span>(<span class="n">BaseModel</span>):
+    system: <span class="n">str</span>          <span class="c"># "intelligence" | "manager" | "package_parser" | "workbook_parser"</span>
+    artifact: <span class="n">str</span>        <span class="c"># "IF-25144.xls" | "SA-AYPP-6-MR-022" | "canonical_project_profile"</span>
+    locator: <span class="n">str</span>         <span class="c"># "Bid S sheet, cell G47" | "folder 02 / BOM.xlsx" | "stage=parsed"</span>
+    parsed_at: <span class="n">Optional</span>[<span class="n">datetime</span>]</pre>
+
+      <h4>The System Prompt — Forcing the Model to Cite</h4>
+      <p>The LLM is instructed to render source references inline with every factual claim. The instruction is part of the stable prefix (cached by Azure OpenAI, see Pillar support-stack section) and is short, direct, unambiguous:</p>
+      <pre><span class="c"># Excerpt from the stable system prompt</span>
+
+<span class="s">For every numeric or factual claim in your response, you MUST include</span>
+<span class="s">a source reference immediately after the claim, in square brackets.</span>
+
+<span class="s">Examples:</span>
+
+<span class="s">  "The grand total is $1,247,350</span>
+<span class="s">   [IF-25144.xls, Bid S sheet, cell G47, parsed 2026-04-12]."</span>
+
+<span class="s">  "This project uses Saudi Aramco standards SAES-D-001 and SAMSS-057</span>
+<span class="s">   [SA-AYPP-6-MR-022, folder 06 Standards]."</span>
+
+<span class="s">If a tool result did not carry a source_ref, DO NOT render the value</span>
+<span class="s">as a claim. Ask for clarification or call a different tool.</span></pre>
+
+      <h4>The Output Guardrail — Enforcement, Not Suggestion</h4>
+      <p>System-prompt instructions are not enough. LLMs, especially under token pressure, will drop instructions they deem decorative. The copilot enforces the citation rule with a programmatic post-processor that lives in the controller layer:</p>
+      <div class="flow">After every LLM response generation:
+
+  1. Extract all numeric values from the response (regex).
+  2. For each numeric value, check: is a <span class="s">source_ref</span> pattern
+     present within N characters of the value?
+  3. If yes → pass.
+  4. If no → reject the response, log the failure, re-prompt with a
+     stricter instruction that explicitly calls out the missing source.
+  5. Retry budget: 2 attempts. After 2 failures, return a safe fallback:
+     "I have the value but cannot confidently cite its source — please
+     consult the underlying artifact directly."
+
+This is the <span class="n">grounding_guardrail</span> and it lives in
+<span class="n">controllers/guardrail_controller.py</span>.</div>
+
+      <h4>Why This Is Stronger Than "Trust the LLM"</h4>
+      <div class="comp-box">
+        <div class="comp-side comp-rejected">
+          <span class="comp-label">Rejected — prompt-only grounding</span>
+          <p>"Tell the LLM to cite sources in the system prompt. It's a smart model, it'll do it."</p>
+          <p><strong>Why rejected:</strong> this is the pattern every 2023–2024 chatbot tutorial advocates, and it fails under real-world pressure. LLMs silently drop citation behavior when the prompt is long, when the context is dense, or when the question is phrased conversationally. There is no enforcement, no measurement, no recovery.</p>
+        </div>
+        <div class="comp-side comp-chosen">
+          <span class="comp-label">Chosen — enforced grounding with retry</span>
+          <p>Prompt instruction + programmatic guardrail + retry loop + safe fallback + logging. The LLM <em>is</em> asked to cite; if it forgets, the guardrail catches it; if the retry fails, the user gets a safe fallback instead of a hallucinated number.</p>
+          <p><strong>Result:</strong> the failure mode is "the copilot occasionally refuses to answer" rather than "the copilot occasionally lies with confidence." For GHI, that trade is obvious.</p>
+        </div>
+      </div>
+
+      <h4>The knowledge boundary — general vs. RFQ-specific</h4>
+      <p>A question I expect the jury to probe: <em>"if the user asks about ASME standards, does the copilot just use LLM knowledge?"</em> The answer is <strong>yes, but only for general explanatory questions</strong>, and the boundary must be explicit and defended. Here is the rule:</p>
+
+      <div class="comp-box">
+        <div class="comp-side comp-chosen" style="background: var(--blue-soft);">
+          <span class="comp-label" style="color: var(--blue);">A. General engineering knowledge</span>
+          <p><strong>LLM may answer from model knowledge without tool calls.</strong></p>
+          <p>Examples:</p>
+          <ul style="margin:6px 0 0 16px;">
+            <li>"What is ASME Section VIII?"</li>
+            <li>"What is PWHT?"</li>
+            <li>"What's the difference between TEMA and ASME?"</li>
+            <li>"What does a U-stamp signify?"</li>
+          </ul>
+          <p>These are general explanatory questions. The model is trained on public engineering content and can answer them as well as a textbook. The copilot does not need to call tools — it would be wasteful and the answer would not be any better.</p>
+        </div>
+        <div class="comp-side comp-chosen">
+          <span class="comp-label">B. RFQ-specific decision-driving knowledge</span>
+          <p><strong>Tools + sources required. No exceptions.</strong></p>
+          <p>Examples:</p>
+          <ul style="margin:6px 0 0 16px;">
+            <li>"Which ASME standards apply to <em>this</em> RFQ?"</li>
+            <li>"Does <em>this</em> package require PWHT?"</li>
+            <li>"Is <em>this</em> vessel compliant with Aramco requirements?"</li>
+            <li>"What inspection standard is mentioned in <em>this</em> MR package?"</li>
+          </ul>
+          <p>These are project-specific decision-driving questions. The answer must come from manager facts, intelligence artifacts, or document retrieval over the actual MR package — never from model knowledge alone. Every numeric or factual claim must carry a <code>source_ref</code>.</p>
+        </div>
+      </div>
+
+      <div class="callout amber">
+        <span class="tag">The boundary in one sentence</span>
+        <p><strong>General concept → LLM may explain. Specific project decision → tools and sources required.</strong> The boundary is enforced by the intent classifier (§9.6): intents tagged as <code>general_knowledge</code> bypass the tool layer and go straight to a cite-minimal narration; intents tagged as anything else (<code>rfq_factual</code>, <code>rfq_analytical</code>, <code>portfolio</code>, <code>rfq_resolution</code>) must call at least one tool before generating a response, and the grounding guardrail checks accordingly.</p>
+      </div>
+
+      <h4>Why this boundary is safe, not lazy</h4>
+      <p>A reader might worry: "if the copilot can answer general questions from model knowledge, isn't that a hallucination risk?" The honest answer: yes, it is a controlled risk, and here is how we control it. First, general-knowledge answers are clearly labeled in the response ("This is a general explanation of PWHT — not specific to any RFQ in the system"). Second, any question that even touches an RFQ-specific decision is routed to the grounded path by the intent classifier, which is tuned to err on the side of tool use. Third, the golden-set evaluation suite includes cases that test both sides of the boundary — questions the copilot should answer without tool calls, and questions where skipping a tool call is a failure.</p>
+
+      <p>This is an important defense point because without this rule, you have two bad options: either force tool calls for every question (wasteful, often impossible — there is no tool that "returns the definition of PWHT") or let the LLM free-form everything (dangerous, fails the grounding pillar). The boundary is the third option, and it is the one serious production systems use.</p>
+
+      <h4>Thesis-defensible framing</h4>
+      <div class="callout purple">
+        <span class="tag">Defense paragraph</span>
+        <p>The copilot implements <strong>grounded generation with provenance</strong> as its anti-hallucination strategy, paired with an explicit <strong>knowledge-boundary rule</strong>: general engineering knowledge may be answered from model knowledge without tool calls (clearly labeled as general); RFQ-specific decision-driving knowledge must come from tool results with <code>source_ref</code> metadata. Every tool result is a structured envelope carrying provenance; the system prompt instructs the LLM to render citations inline with every factual claim; a programmatic post-processor verifies citation presence and retries on failure. This is the conversational analogue of the deterministic-first discipline already applied in the workbook and MR-package parsers in <code>rfq_intelligence_ms</code> (cf. <em>attributed QA</em> literature; Rashkin et al. 2023 on attribution; and the 2024–2025 production consensus on reducing hallucination in high-stakes domains through enforced grounding rather than prompt-only suggestion).</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S7 — PILLAR 3: ROLE-AWARE GENERATION -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s7">
+    <div class="sh">
+      <div class="sh-num">Section 07 · Pillar 3</div>
+      <h2>Role-Aware, Access-Aware Answer Generation <span class="innovation-badge">Innovation 03</span></h2>
+      <p>The same factual question returns different answers for different users, driven by identity and role resolved through the current IAM seam. This is where access control stops being an API-layer concern and becomes a generated-content concern.</p>
+    </div>
+
+    <div class="pillar p3">
+      <div class="pillar-header">
+        <span class="pillar-num">Pillar 03</span>
+        <h3>Role-Aware / Access-Aware Answer Generation</h3>
+      </div>
+      <div class="one-liner">Identity is resolved through the current IAM seam (shared with <code>rfq_manager_ms</code>). Role is determined. Role-specific framing, allowed data, and redaction rules are injected into the prompt and enforced in the output layer. Same question, different role, different answer — by design.</div>
+
+      <h4>The Problem</h4>
+      <p>In most LLM-powered enterprise chatbots, access control stops at the API layer: "can this user hit this endpoint?" — yes or no. That's appropriate for traditional applications where the API returns structured data and the UI renders it with role-appropriate widgets. It is <em>not</em> sufficient for a conversational system, for one simple reason:</p>
+      <div class="callout amber">
+        <span class="tag">The insight</span>
+        <p>A copilot does not return data. It returns <strong>generated natural-language narrations of data</strong>. The narration itself is a new artifact the access-control system has never seen before. "Can this user know this?" is not the same question as "can this user's API call succeed?".</p>
+      </div>
+      <p>Concretely: an Estimation Department Lead and an executive might both have API-level read access to a pressure-vessel RFQ's canonical profile. But when they ask <em>"how's the margin on this?"</em>, they need different answers. The Estimation Department Lead owns cost analysis and needs the internal cost breakdown and the raw margin number. The executive needs the margin number plus the bid-strategy framing ("comfortable," "tight," "requires negotiation"). A junior engineer, even with API-level access to the same data, should not see the raw margin at all — they're exposed to sensitive financial information they have no operational need for.</p>
+
+      <h4>RBAC + ABAC — The Practical Pattern</h4>
+      <p>The copilot uses the industry-standard combination of <strong>Role-Based Access Control (RBAC)</strong> for broad strokes and <strong>Attribute-Based Access Control (ABAC)</strong> for edge cases. This is not a new access-control model — it's the honest pattern most enterprise systems actually implement once they are serious. The novelty is in <em>what</em> we access-control: generated content, not just API endpoints.</p>
+
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:90px;">Layer</th>
+            <th style="width:120px;">Mechanism</th>
+            <th>What it does in the copilot</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1</strong></td>
+            <td><strong>Identity resolution</strong></td>
+            <td>Every request carries authentication context resolved through the current IAM seam — the same path <code>rfq_manager_ms</code> uses today (via its <code>connectors/iam</code> connector, or the demo auth-bypass flow for local smoke testing). The copilot extracts <code>user_id</code>, <code>role</code>, and <code>attributes</code> from this context and attaches them to the session state. No identity = no answer. In Phase 2, a dedicated <code>rfq_iam_ms</code> service becomes the canonical authority without requiring copilot code changes — only the connector target changes.</td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td><strong>Role config table</strong></td>
+            <td>A static Python dict <code>role_configs</code> in <code>config/role_config.py</code> maps each role to: allowed topics, forbidden topics, framing style, data redaction rules, and role-specific system prompt text. Phase 1 mandatory roles: <code>estimation_dept_lead</code> and <code>executive</code>. Optional stretch role: <code>junior_engineer</code> (restricted variant, used to demonstrate the forbidden-content path if time permits).</td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td><strong>ABAC overrides</strong></td>
+            <td>Authorship, departmental ownership, and project-level assignments override role defaults. Rule: <em>a user can always see RFQs they authored, regardless of role-level restrictions on that data type.</em></td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td><strong>Prompt injection</strong></td>
+            <td>The <code>ContextBuilder</code> injects <code>role_framing</code> text into the stable prefix of the system prompt. The LLM receives role context as part of its standing instructions.</td>
+          </tr>
+          <tr>
+            <td><strong>5</strong></td>
+            <td><strong>Tool-level filtering</strong></td>
+            <td>Tools that return role-sensitive fields accept a <code>role</code> parameter and internally redact or recompute based on it. Margin tool for Estimation Department Lead returns raw numbers and cost breakdown; for executive returns rolled-up figures with bid-strategy framing; for junior_engineer returns a restricted envelope.</td>
+          </tr>
+          <tr>
+            <td><strong>6</strong></td>
+            <td><strong>Output validation</strong></td>
+            <td>A role-aware output guardrail scans the generated response for forbidden content patterns for the current role. Belt-and-suspenders: if the LLM somehow surfaced a forbidden value, the guardrail catches it.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>Phase 1 Scope — Thin but Real</h4>
+      <p>We commit to demoable role-awareness in Phase 1, not the full enterprise implementation. The honest scope:</p>
+      <div class="callout green">
+        <span class="tag">Phase 1 commitment — the mandatory pair</span>
+        <p><strong>Two mandatory roles, fully implemented in Phase 1:</strong></p>
+        <ul style="margin:6px 0 10px 16px;">
+          <li><code>estimation_dept_lead</code> — the person who owns cost analysis and margin computation at GHI. Sees the full cost mechanics, raw margin numbers, Mat Break-up detail, and all estimation-facing context.</li>
+          <li><code>executive</code> — the person who sees rolled-up bid-strategy views. Gets the margin as a qualitative framing ("healthy," "tight," "requires negotiation") plus the bid-strategy recommendation, not the raw cost breakdown.</li>
+        </ul>
+        <p><strong>Two to three sensitive question families covered:</strong> (1) raw margin and cost breakdown, (2) bid-strategy framing, (3) historical win-rate references (where available, with honest absence otherwise).</p>
+        <p><strong>Clearly different answers</strong> for the same question across the two mandatory roles, verified by the golden-set evaluation suite.</p>
+      </div>
+
+      <div class="callout amber">
+        <span class="tag">Phase 1 stretch — optional third role</span>
+        <p><strong>Optional:</strong> <code>junior_engineer</code> as a restricted variant, used to demonstrate the forbidden-content path (the user asks about margin, the copilot refuses with an honest alternative offer). This is Priority 2 / stretch scope — if the mandatory pair ships cleanly and time remains, add this third role and extend the demo to show the three-way contrast. If time tightens, drop to the two-role core and note in the defense that the forbidden-content path is designed and tested but not demoed live.</p>
+      </div>
+
+      <h4>Example — Same Question, Three Roles</h4>
+      <p>Question: <em>"What's the margin on this RFQ?"</em> (asked against RFQ backed by IF-25144.xls)</p>
+
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:130px;">Role</th>
+            <th>Chatbot response (illustrative)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>estimation_dept_lead</strong></td>
+            <td>"The gross margin is <strong>18.4%</strong> on a grand total of <strong>$1,247,350</strong> <em>[IF-25144.xls, Bid S sheet, cells G47 and G52]</em>. Cost breakdown: materials 62%, labor 21%, overhead 11%, contingency 6%. The margin is consistent with similar pressure-vessel jobs, though historical benchmarking is not yet available — this is the first recorded Aramco PV RFQ of this class. Would you like to drill into the Mat Break-up sheet to review the material cost drivers?"</td>
+          </tr>
+          <tr>
+            <td><strong>executive</strong></td>
+            <td>"Margin on this RFQ is <strong>healthy</strong> — approximately <strong>18%</strong> <em>[IF-25144.xls, Bid S sheet]</em>. This puts GHI in a comfortable bid-strategy position: there is room to offer modest concessions if Aramco pushes back on price, and the cost structure is consistent with similar pressure-vessel work. Historical win-rate benchmarking isn't yet available for this project class — once 5+ similar outcomes are recorded, I'll be able to show comparative context."</td>
+          </tr>
+          <tr>
+            <td><strong>junior_engineer</strong></td>
+            <td>"Margin and pricing information are restricted to the Estimation Department Lead and executive roles. I can help you with technical scope, BOQ line items, standards compliance, or the parsing status of this RFQ. Would any of those be useful?"</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Notice how all three responses are <em>factually grounded in the same underlying data</em>, but the framing, the level of detail, and the access posture are entirely different. The Estimation Department Lead gets the full cost mechanics because that's their operational need; the executive gets the bid-strategy framing because that's <em>their</em> operational need; the junior engineer is honestly told that pricing is out of scope for their role, with alternatives they <em>can</em> use.</p>
+
+      <h4>The Demo Moment</h4>
+      <div class="callout purple">
+        <span class="tag">Defense demo</span>
+        <p>The role-awareness demo is <strong>the single strongest moment</strong> in the five-minute copilot walk-through. The jury sees the same question asked twice (or three times, if the stretch role is included), with clearly different, clearly justified answers. It is immediately legible to both academic and BACAB audiences. It is impossible to fake. It takes 45 seconds on screen and will be remembered for hours after the defense.</p>
+      </div>
+
+      <h4>Thesis-Defensible Framing</h4>
+      <div class="callout purple">
+        <span class="tag">Defense paragraph</span>
+        <p>The copilot implements <strong>role-aware answer generation</strong> by combining RBAC (role-level defaults) and ABAC (attribute-level overrides), resolved through the current IAM seam (shared with <code>rfq_manager_ms</code>, auth-bypass for local smoke tests, future <code>rfq_iam_ms</code> service for canonical Phase 2 enforcement), applied at two layers: prompt injection into the stable system prefix and output-level guardrail enforcement. The novelty is not the access-control model — RBAC+ABAC is industry-standard — but the <em>application point</em>: generated natural-language content, not just API endpoints. In a conversational interface, the answer itself is an artifact the access-control system has never seen before, and it requires its own enforcement layer.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S8 — PILLAR 4: GRACEFUL DEGRADATION -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s8">
+    <div class="sh">
+      <div class="sh-num">Section 08 · Pillar 4</div>
+      <h2>Confidence-Aware Graceful Degradation <span class="innovation-badge">Innovation 04</span></h2>
+      <p>What the agent <em>claims</em> is conditioned on how confident its sources are. Deterministic facts are stated plainly. Pattern-based inferences are surfaced with their provenance. Absent capabilities are named honestly, with the conditions under which they would become available.</p>
+    </div>
+
+    <div class="pillar p4">
+      <div class="pillar-header">
+        <span class="pillar-num">Pillar 04</span>
+        <h3>Confidence-Aware Graceful Degradation</h3>
+      </div>
+      <div class="one-liner">Every tool result carries explicit confidence metadata. The copilot's rendering of that result is explicitly conditioned on the confidence level. The cold-start isn't hidden — it's surfaced, honestly, in every turn.</div>
+
+      <h4>Why This Pillar Exists</h4>
+      <p>This pillar directly addresses the biggest academic vulnerability of the project: <strong>intelligence is cold-started on one sample</strong>. The PFE jury will notice. The question is how we answer when they ask about it.</p>
+
+      <div class="comp-box">
+        <div class="comp-side comp-rejected">
+          <span class="comp-label">Bad answer (defensive)</span>
+          <p>"Intelligence is partial because we don't have enough data yet."</p>
+          <p><em>Sounds like a limitation we wish wasn't there. Apologetic. Treats the cold-start as a wound.</em></p>
+        </div>
+        <div class="comp-side comp-chosen">
+          <span class="comp-label">Good answer (confident)</span>
+          <p>"Intelligence is <strong>intentionally layered by confidence</strong>, and the copilot is designed to behave differently depending on what intelligence can and cannot say. The cold-start isn't hidden — it's surfaced in every interaction. This is an architectural principle, not a workaround."</p>
+          <p><em>Turns a weakness into a design feature. The jury respects this.</em></p>
+        </div>
+      </div>
+      <p>Graceful degradation is what makes the second answer true. Without this pillar, we are claiming we have graceful degradation and hoping it works. With this pillar, we have designed and built the mechanism that makes the claim honest.</p>
+
+      <h4>The Three Confidence States</h4>
+      <p>Every piece of information the copilot uses has one of three confidence classifications, determined by <code>rfq_intelligence_ms</code> and surfaced through the tool result envelope (see Pillar 2):</p>
+
+      <div class="pillar p2" style="margin: 20px 0;">
+        <h4 style="margin-top:0; color:var(--green);">State A — Deterministic <span class="tag-pill tag-det">high confidence</span></h4>
+        <p>The information came from a deterministic parser operating on a known-template input. Example: the grand total from IF-25144's Bid S sheet, cell G47, extracted by the frozen workbook parser with fixed rules, no LLM involved.</p>
+        <p><strong>Chatbot behavior:</strong> state the value plainly. No hedging. "The grand total is $1,247,350 [IF-25144.xls, Bid S sheet, G47]."</p>
+      </div>
+
+      <div class="pillar p3" style="margin: 20px 0;">
+        <h4 style="margin-top:0; color:var(--amber);">State B — Pattern-based, 1-sample validated <span class="tag-pill tag-p1">partial confidence</span></h4>
+        <p>The information is derived from a rule, heuristic, or extraction path validated against only the one golden sample. Example: a detection rule that says "this looks like an Aramco pressure vessel project" based on keyword patterns observed in SA-AYPP-6-MR-022 folder 06.</p>
+        <p><strong>Chatbot behavior:</strong> state the value with explicit provenance framing. "Based on document keywords in folder 06, this appears to be an Aramco pressure vessel project <em>(pattern-based, validated against 1 sample)</em>." The qualifier is mandatory, not decorative.</p>
+      </div>
+
+      <div class="pillar p4" style="margin: 20px 0;">
+        <h4 style="margin-top:0; color:var(--purple);">State C — Absent / cold-start <span class="tag-pill tag-abs">no guessing</span></h4>
+        <p>The information <em>would</em> come from a capability that doesn't exist yet because the data isn't there. Example: historical win-rate benchmarking, requires outcome data the system doesn't have.</p>
+        <p><strong>Chatbot behavior:</strong> do not guess, do not deflect vaguely, do not hallucinate a plausible number. Explicitly surface the gap <strong>and name the condition under which the capability would exist</strong>: "Historical win-rate benchmarking isn't available yet — this is the first recorded Aramco pressure-vessel RFQ of this class. Once outcomes are recorded on ≥5 similar projects, I'll be able to compare win rates."</p>
+      </div>
+
+      <div class="callout">
+        <span class="tag">The killer move</span>
+        <p>The named condition in State C (<em>"once outcomes are recorded on ≥5 similar projects"</em>) is what makes this pillar different from "the copilot apologizes for missing data." It's not apology — it's a <strong>contract with the future</strong>. It also gives BACAB a concrete business case for collecting structured outcome data: here's exactly what the copilot could do once the data exists.</p>
+      </div>
+
+      <h4>How It Works Technically</h4>
+      <div class="flow">1. Every tool returns a <span class="n">ToolResultEnvelope</span> (see Pillar 2)
+   with <span class="s">confidence</span> and <span class="s">validated_against</span> fields already populated.
+
+2. <span class="n">rfq_intelligence_ms</span> owns confidence classification. The copilot
+   never decides confidence — it reads what intelligence returns.
+   (This is a minor extension to intelligence's existing frozen contract:
+    surface the confidence metadata intelligence already tracks internally.)
+
+3. The system prompt instructs the LLM on how to render each state:
+
+   - <span class="s">confidence == "deterministic"</span>  → state plainly with source_ref
+   - <span class="s">confidence == "pattern_1_sample"</span> → state with "validated against 1 sample" qualifier
+   - <span class="s">confidence == "absent"</span>         → state explicitly + named future condition
+
+4. A dedicated tool <span class="n">get_capability_status(topic)</span> exists for
+   questions the system can't confidently handle. It returns a structured
+   explanation of why the capability is absent and what would be needed.
+   This is the "speakable absence" tool.
+
+5. The output guardrail (see Pillar 2) is extended: if a tool result said
+   <span class="s">confidence: pattern_1_sample</span> but the response omits the qualifier,
+   the guardrail rejects and retries. Grounding and confidence are
+   enforced by the same mechanism.</div>
+
+      <h4>The Three-Case Demo Narrative</h4>
+      <p>Pillar 4's implementation is validated by a specific three-question demo sequence that exercises all three confidence states in a single conversation. These form the first three beats of the full defense demo (see Section 13); here is the summary:</p>
+      <div class="demo-box">
+        <div class="demo-step">
+          <div class="demo-num">1</div>
+          <div>
+            <div class="demo-q">"What's the grand total for IF-25144?"</div>
+            <div class="demo-a"><strong>Expected behavior:</strong> deterministic answer, clean source tag, no hedging. <span class="demo-tag tag-det">state A</span></div>
+          </div>
+        </div>
+        <div class="demo-step">
+          <div class="demo-num">2</div>
+          <div>
+            <div class="demo-q">"Is this an Aramco pressure vessel project?"</div>
+            <div class="demo-a"><strong>Expected behavior:</strong> pattern-based answer with "validated against 1 sample" qualifier explicit in the rendered text. <span class="demo-tag tag-p1">state B</span></div>
+          </div>
+        </div>
+        <div class="demo-step">
+          <div class="demo-num">3</div>
+          <div>
+            <div class="demo-q">"What's our typical win rate on projects like this?"</div>
+            <div class="demo-a"><strong>Expected behavior:</strong> honest absence, named future condition. "Historical benchmarking isn't available yet — once outcomes are recorded on ≥5 similar projects..." <span class="demo-tag tag-abs">state C</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Thesis-Defensible Framing</h4>
+      <div class="callout purple">
+        <span class="tag">Defense paragraph</span>
+        <p>The copilot implements <strong>confidence-aware graceful degradation</strong> as a first-class architectural principle: every tool result carries explicit confidence metadata (deterministic, pattern-based 1-sample, or absent), and the LLM's rendering of that result is explicitly conditioned on the confidence level. Absent capabilities are not hidden — they are surfaced with named conditions under which they would become available, turning the cold-start data reality into a design feature rather than an apology. This is the same epistemic-humility-as-design-principle discipline already applied in <code>rfq_intelligence_ms</code>'s <em>validated_against: 1_sample → multi_sample</em> promotion policy, extended into the conversational layer.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S9 — THE SUPPORTING STACK -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s9">
+    <div class="sh">
+      <div class="sh-num">Section 09</div>
+      <h2>The Supporting Stack</h2>
+      <p>The four pillars sit on a supporting stack of engineering infrastructure that is less glamorous but equally load-bearing. This section covers context engineering, memory, retrieval, tool interface, guardrails, determinism, and evaluation — the rest of the architectural choices slide.</p>
+    </div>
+
+    <!-- 9.1 CONTEXT ENGINEERING -->
+    <h3>9.1 Context Engineering — The Discipline Above Everything</h3>
+    <p>Context engineering is the systems discipline of deciding <em>what ends up inside the LLM's context window on every single call</em> — which system instructions, which conversation history, which retrieved documents, which tool definitions, which user state — and in what order and what form. The term was popularized by Andrej Karpathy (mid-2025) and Anthropic's engineering team (<em>Effective Context Engineering for AI Agents</em>, 2025); it replaces "prompt engineering" as the primary skill for building reliable LLM systems.</p>
+
+    <p>The empirical finding that motivates the discipline is sharp: <strong>more context makes LLMs dumber, not smarter</strong>. Chroma's 2025 study on 18 frontier models found every model degraded as input length grew, some dropping from 95% to 60% accuracy past a threshold. The phenomena are named: <em>context rot</em> (accuracy decay with length), <em>lost-in-the-middle</em> (middle-sequence tokens get ignored due to RoPE positional encoding), <em>context pollution</em> (too much redundant info distracts), and <em>context collapse</em> (iterative rewrites erode important details).</p>
+
+    <h4>The four core moves — and how we operationalize each one</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:110px;">Move</th>
+          <th style="width:140px;">Purpose</th>
+          <th>How the copilot does it</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Write</strong></td>
+          <td>Persist outside the context window</td>
+          <td>Session state lives in Postgres (see §9.2 Memory). Scratchpads for intermediate reasoning are stored and referenced by ID, not re-pasted every turn.</td>
+        </tr>
+        <tr>
+          <td><strong>Select</strong></td>
+          <td>Retrieve only what's relevant now</td>
+          <td>Stage-relevant tool definitions only; current RFQ profile only; last N turns only; document retrieval only for document-intent queries.</td>
+        </tr>
+        <tr>
+          <td><strong>Compress</strong></td>
+          <td>Summarize or trim older content</td>
+          <td>Conversation history past N turns is compressed into a "conversation summary so far" block. The last N turns remain verbatim.</td>
+        </tr>
+        <tr>
+          <td><strong>Isolate</strong></td>
+          <td>Partition to prevent cross-contamination</td>
+          <td><strong>Scoped sessions.</strong> RFQ-bound sessions belong to one RFQ; portfolio sessions isolate to portfolio data. No cross-pollination between different conversations. Session isolation is enforced at the <code>session_id → rfq_id</code> (which can be null) binding level.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>All four moves appear explicitly in the architecture. This is not name-dropping; every move has a corresponding implementation in the code, listed above. The discipline is operationalized, not decorative.</p>
+
+    <h4>The ContextBuilder — where it all lives in code</h4>
+    <p>A single class, <code>controllers/context_builder.py</code>, is responsible for assembling the prompt on every turn. It takes a <code>TurnRequest</code> and returns a <code>PromptEnvelope</code> with explicit token budgets for each piece:</p>
+    <pre><span class="c"># controllers/context_builder.py</span>
+<span class="k">class</span> <span class="n">ContextBuilder</span>:
+
+    <span class="k">def</span> <span class="n">build</span>(<span class="n">self</span>, req: <span class="n">TurnRequest</span>) -> <span class="n">PromptEnvelope</span>:
+        <span class="c"># STABLE PREFIX — cacheable by Azure OpenAI</span>
+        system_prompt    = <span class="n">self</span>.<span class="n">_base_system_prompt</span>()           <span class="c"># ~1200 tokens</span>
+        role_framing     = <span class="n">self</span>.<span class="n">_role_framing</span>(req.role)          <span class="c"># ~200 tokens</span>
+        stage_framing    = <span class="n">self</span>.<span class="n">_stage_framing</span>(req.stage)        <span class="c"># ~250 tokens</span>
+        tool_definitions = <span class="n">self</span>.<span class="n">_tools_for_stage</span>(req.stage)     <span class="c"># ~800 tokens</span>
+        <span class="c"># All of the above is IDENTICAL across turns of the same conversation.</span>
+        <span class="c"># Azure OpenAI will hit the prompt cache on it.</span>
+
+        <span class="c"># VARIABLE SUFFIX</span>
+        <span class="k">if</span> session.mode == <span class="s">'rfq_bound'</span>:
+            context_snapshot = <span class="n">self</span>.<span class="n">_rfq_profile</span>(req.rfq_id)    <span class="c"># ~400 tokens</span>
+        <span class="k">else</span>:
+            context_snapshot = <span class="n">self</span>.<span class="n">_portfolio_context</span>()        <span class="c"># portfolio mode data</span>
+
+        conv_history         = <span class="n">self</span>.<span class="n">_compressed_history</span>(req)    <span class="c"># variable, bounded</span>
+        latest_user_turn     = req.<span class="n">user_message</span>                 <span class="c"># the actual new input</span>
+
+        <span class="k">return</span> <span class="n">PromptEnvelope</span>(
+            stable_prefix=<span class="n">self</span>.<span class="n">_assemble_prefix</span>(
+                system_prompt, role_framing, stage_framing, tool_definitions
+            ),
+            variable_suffix=<span class="n">self</span>.<span class="n">_assemble_suffix</span>(
+                context_snapshot, conv_history, latest_user_turn
+            ),
+            total_budget=6000,  <span class="c"># hard token budget, tracked</span>
+        )</pre>
+
+    <div class="callout">
+      <span class="tag">Why the order matters</span>
+      <p>The stable prefix comes <em>first</em>. Always. This is the architectural design decision that makes Azure OpenAI prompt caching applicable — not a runtime optimization. If the ContextBuilder were to put the user turn at the top and the system prompt at the bottom, caching would never fire and every turn would pay full price. The ordering is a design constraint enforced in <code>ContextBuilder</code>.</p>
+    </div>
+
+    <!-- 9.2 MEMORY -->
+    <h3>9.2 Memory — Two Layers, Honestly</h3>
+    <p>The 2025–2026 literature distinguishes four memory types (working, episodic, semantic, procedural) drawn from cognitive science (Tulving's taxonomy; Sumers et al. 2024 CoALA). Phase 1 implements two of the four. Here's why, and what each one is:</p>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:140px;">Type</th>
+          <th style="width:100px;">Status</th>
+          <th>Description and Phase 1 decision</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Working memory</strong></td>
+          <td><span class="tag-pill tag-det">Phase 1</span></td>
+          <td>The current context window itself, managed by <code>ContextBuilder</code>. Small, fast, volatile. Holds the active conversation and the immediate task context.</td>
+        </tr>
+        <tr>
+          <td><strong>Episodic memory</strong></td>
+          <td><span class="tag-pill tag-det">Phase 1</span></td>
+          <td>A Postgres table <code>chatbot_conversations</code> storing <code>{conversation_id, rfq_id, user_id, turn_number, role, content, timestamp, tool_calls, source_refs}</code>. Retrieval is by exact match (conversation_id) and by time window. No embeddings, no vector search — just clean relational storage of what happened.</td>
+        </tr>
+        <tr>
+          <td><strong>Semantic memory</strong></td>
+          <td><span class="tag-pill tag-abs">Future work</span></td>
+          <td>Distilled, generalized knowledge ("user prefers metric units," "this role typically asks about margins first"). Consolidation from episodic to semantic is the hardest problem in the field (cf. MemAgents ICLR 2026 workshop; Sumers et al. 2024; the consolidation step is "particularly underserved" in current systems). Deferred until real usage data exists.</td>
+          </tr>
+        <tr>
+          <td><strong>Procedural memory</strong></td>
+          <td><span class="tag-pill tag-abs">Future work</span></td>
+          <td>Learned workflows, tool-use patterns, SOPs. Requires actual usage to distill. Mem0's v1.0.0 API (early 2026) added explicit support; we defer on the same grounds as semantic memory.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout amber">
+      <span class="tag">Honest scoping</span>
+      <p>A full four-layer memory architecture with automated episodic→semantic consolidation is a research project by itself. Doing it on cold-start data would be overclaiming. The system is designed so that episodic memory accumulates from day one, and once sufficient real sessions exist (estimated ≥50 distinct RFQ conversations), consolidation into semantic memory becomes meaningful and validatable. This is the same <em>validated_against: 1_sample → multi_sample</em> discipline applied to the memory layer.</p>
+    </div>
+
+    <p><strong>No Mem0 or MemMachine dependency.</strong> Both are excellent frameworks in 2026, but plain Postgres is more defensible for Phase 1: every row has a known schema, every retrieval is explainable, no framework magic, no learning curve, no new infrastructure (filter C10). The academic citation path remains open — the thesis can still cite Mem0 / MemMachine / CoALA as the conceptual lineage.</p>
+
+    <!-- 9.3 RETRIEVAL -->
+    <h3>9.3 Retrieval — Intelligence Snapshot First, Documents When Necessary</h3>
+    <p>The counter-intuitive finding when mapping the retrieval landscape to GHI: <strong>classic RAG is not the main retrieval path.</strong> The important information in an industrial RFQ is structured data, already parsed and assembled into artifacts by <code>rfq_intelligence_ms</code>. When a user asks "what's the grand total?", semantic search over a document would be the wrong tool. The right tool is a direct typed call to intelligence's consumer-facing read model — the <strong>snapshot</strong>.</p>
+
+    <h4>The primary surface — intelligence read APIs</h4>
+    <p>The intelligence service exposes a set of consumer-facing read endpoints designed precisely for this purpose. From the <code>rfq_intelligence_ms</code> repository README:</p>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:280px;">Endpoint</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GET /intelligence/v1/rfqs/{rfq_id}/snapshot</code></td><td><strong>Main entry point</strong> — consumer-facing read model assembled per RFQ. This is the copilot's default structured retrieval.</td></tr>
+        <tr><td><code>GET /intelligence/v1/rfqs/{rfq_id}/briefing</code></td><td>Latest intelligence briefing (the proactive dossier generated on RFQ creation).</td></tr>
+        <tr><td><code>GET /intelligence/v1/rfqs/{rfq_id}/workbook-profile</code></td><td>Latest workbook profile — structured extraction from the estimation workbook.</td></tr>
+        <tr><td><code>GET /intelligence/v1/rfqs/{rfq_id}/workbook-review</code></td><td>Latest workbook review report — bridge artifact comparing intake vs workbook.</td></tr>
+        <tr><td><code>GET /intelligence/v1/rfqs/{rfq_id}/artifacts</code></td><td>Artifact index with versions and statuses.</td></tr>
+      </tbody>
+    </table>
+    <p>These endpoints are explicitly positioned in intelligence's README as the consumer read surface, and intelligence explicitly names the copilot as a consumer. The copilot does not reach into intelligence's internals; it consumes the published read APIs like any other consumer.</p>
+
+    <h4>Three retrieval paths</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:200px;">Path</th>
+          <th style="width:130px;">When it runs</th>
+          <th>How</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Intelligence snapshot</strong> <span class="tag-pill tag-det">primary</span></td>
+          <td>RFQ-specific factual/analytical queries</td>
+          <td>Direct typed calls to <code>/snapshot</code>, <code>/briefing</code>, <code>/workbook-review</code>, <code>/workbook-profile</code>. The snapshot is the copilot's default context when a conversation is RFQ-bound.</td>
+        </tr>
+        <tr>
+          <td><strong>Manager portfolio</strong> <span class="tag-pill tag-det">primary (Mode B)</span></td>
+          <td>Portfolio / cross-RFQ queries</td>
+          <td>Direct typed calls to <code>rfq_manager_ms</code>'s stats, analytics, and list endpoints (<code>/rfqs/stats</code>, <code>/rfqs/analytics</code>, <code>/rfqs</code>). Used primarily in Global Copilot mode.</td>
+        </tr>
+        <tr>
+          <td><strong>Document retrieval</strong> <span class="tag-pill tag-hybrid">exception path</span></td>
+          <td>Document-intent queries only</td>
+          <td>pgvector extension on existing Postgres (no new infra). Embeddings via Azure OpenAI <code>text-embedding-3-small</code>. Scoped to MR package documents only. Top-k retrieval, optional reranker if Priority-3 time permits. <strong>This is the exception path, not the default.</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The intent classifier (see §9.7) routes queries to the appropriate path. Queries like <em>"what's the grand total?"</em> or <em>"what stage is this in?"</em> go to the snapshot path. Queries like <em>"which RFQs are near deadline?"</em> go to the portfolio path. Queries like <em>"does the spec require PWHT?"</em> or <em>"what inspection standards does folder 06 reference?"</em> route to document retrieval over the MR package documents — and only then.</p>
+
+    <div class="callout green">
+      <span class="tag">Defense paragraph</span>
+      <p>Retrieval defaults to intelligence's structured read APIs — the snapshot, briefing, workbook profile, and workbook review. Portfolio queries default to manager's stats and analytics endpoints. Document RAG over MR package content is an explicit exception path, used only for genuinely unstructured queries like spec interpretation. This is a deliberate application of the <em>deterministic-first</em> principle already used in the intelligence service's parsers — chosen because the failure mode of semantic search on structured data (paraphrase-driven wrong matches) is unacceptable in a domain where numeric precision matters. Classic RAG is an exception path, not the primary retrieval strategy.</p>
+    </div>
+
+    <p><strong>What we do not build:</strong> GraphRAG across multiple RFQs (insufficient data), historical similarity search (cold-start), HyDE / query decomposition (not needed for the narrow retrieval scope), hybrid lexical+semantic fusion (nice-to-have but out of time budget). All are named as future work.</p>
+
+    <!-- 9.4 TOOL INTERFACE -->
+    <h3>9.4 Tool Interface — MCP-Shaped, Not MCP-Native</h3>
+
+    <p>The tool interface is the most strategically consequential decision in this brief, because it determines how forward-compatible the copilot is with the broader 2026 agentic ecosystem. The architectural choices slide commits to "MCP-shaped function calling (Phase 2: native MCP)". Here is the full reasoning.</p>
+
+    <h4>The landscape in April 2026</h4>
+    <p>The <strong>Model Context Protocol (MCP)</strong>, introduced by Anthropic in November 2024, became the universal standard for connecting AI systems to tools and data in 16 months. By March 2026 it had 97M+ monthly SDK downloads and 10,000+ public servers, with adoption from Anthropic, OpenAI, Google DeepMind, Microsoft, and AWS. In December 2025 Anthropic donated it to the Linux Foundation's new Agentic AI Foundation to keep it vendor-neutral. Azure OpenAI supports MCP via the Microsoft Copilot Studio integration and the OpenAI Agents SDK.</p>
+
+    <p>In plain terms: <strong>MCP is the industry's "USB-C for AI."</strong> Exposing a service as an MCP server means any MCP-compliant client — Claude Desktop, ChatGPT, Cursor, internal dashboards, future agents — can talk to it. Write once, connect to many.</p>
+
+    <h4>The three options we considered</h4>
+    <div class="comp-box" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="comp-side comp-rejected">
+        <span class="comp-label">Option A — Full Native MCP</span>
+        <p><strong>Build MCP servers</strong> wrapping manager and intelligence; copilot is an MCP client.</p>
+        <p><strong>Pros:</strong> maximally current, vendor-neutral, forward-compatible (any MCP client can drive our services later).</p>
+        <p><strong>Cons:</strong> adds real implementation work. We can't touch manager (C4), so we'd need an MCP adapter service in front of it. OAuth 2.1 enterprise auth is still maturing (Q2 2026 roadmap). Too much for the Phase 1 time budget.</p>
+      </div>
+      <div class="comp-side comp-rejected" style="border-right: 1px solid var(--border);">
+        <span class="comp-label">Option B — Function Calling, No MCP</span>
+        <p><strong>Build function-calling tools</strong> using Azure OpenAI's native support; no MCP framing.</p>
+        <p><strong>Pros:</strong> zero impact on manager, fits BACAB layered pattern, easiest to ship.</p>
+        <p><strong>Cons:</strong> the thesis framing loses the "MCP-aligned, forward-compatible" story. Loses a meaningful architectural differentiator for the defense.</p>
+      </div>
+      <div class="comp-side comp-chosen">
+        <span class="comp-label">✓ Option C — MCP-Shaped Function Calling</span>
+        <p><strong>Build function-calling tools</strong>, but design the tool surface <em>as if it were an MCP server</em>. Same naming conventions, same structured schemas, same resource/tool/prompt distinction.</p>
+        <p><strong>Pros:</strong> ships now, respects C4 (no manager changes), fits BACAB, <em>and</em> gives us a clean Phase 2 migration path to native MCP.</p>
+        <p><strong>Thesis framing:</strong> "We are MCP-ready, not MCP-native." Defensible, honest, strategically positioned.</p>
+      </div>
+    </div>
+
+    <h4>The tools we actually build</h4>
+    <p>Approximately 10 core tools, each a thin wrapper over a BACAB connector, each with Pydantic schemas, each returning a <code>ToolResultEnvelope</code> (Pillar 2). The tool surface is grouped by mode and by backing service:</p>
+
+    <h4 style="color:var(--blue); margin-top:24px;">Group 1 — RFQ-scoped tools (used in Mode A and after Mode B pivot)</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:260px;">Tool</th>
+          <th style="width:150px;">Backing service</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>get_rfq_snapshot(rfq_id)</code></td><td>intelligence <code>/snapshot</code></td><td><strong>The default read.</strong> Returns intelligence's consumer-facing read model for the RFQ — the assembled view used by every RFQ-bound conversation.</td></tr>
+        <tr><td><code>get_intelligence_briefing(rfq_id)</code></td><td>intelligence <code>/briefing</code></td><td>Returns the latest intelligence briefing artifact — the proactive dossier generated on RFQ creation.</td></tr>
+        <tr><td><code>get_workbook_review(rfq_id)</code></td><td>intelligence <code>/workbook-review</code></td><td>Returns the workbook review report — the bridge artifact comparing intake vs workbook, used for completeness and discrepancy queries.</td></tr>
+        <tr><td><code>get_workbook_profile(rfq_id)</code></td><td>intelligence <code>/workbook-profile</code></td><td>Returns the raw workbook profile when drill-down is needed past what the snapshot exposes.</td></tr>
+        <tr><td><code>get_rfq_profile(rfq_id)</code></td><td>manager <code>/rfqs/{id}</code></td><td>Returns the RFQ record from manager — lifecycle timestamps, authoring info, operational metadata.</td></tr>
+        <tr><td><code>get_rfq_stage(rfq_id)</code></td><td>manager <code>/rfqs/{id}/stages</code></td><td>Returns live <code>rfq_stage</code> records with template metadata. Used by Pillar 1 (stage-aware) on every RFQ-bound turn.</td></tr>
+        <tr><td><code>search_mr_documents(rfq_id, query)</code></td><td>intelligence (exception path)</td><td>Semantic search over MR package documents for document-intent queries. Exception path, not default (see §9.3).</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="color:var(--purple); margin-top:24px;">Group 2 — Portfolio tools (used in Mode B before pivot)</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:260px;">Tool</th>
+          <th style="width:150px;">Backing service</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>list_rfqs(filters)</code></td><td>manager <code>/rfqs</code></td><td>Returns a filtered list of RFQs with summary metadata. Used for "which RFQs are..." questions.</td></tr>
+        <tr><td><code>get_rfq_stats()</code></td><td>manager <code>/rfqs/stats</code></td><td>Returns aggregate portfolio stats — counts by stage, by client, by status.</td></tr>
+        <tr><td><code>get_rfq_analytics(params)</code></td><td>manager <code>/rfqs/analytics</code></td><td>Returns analytical queries over the portfolio — trends, distributions, near-deadline lists.</td></tr>
+        <tr><td><code>resolve_rfq_by_name(query)</code></td><td>manager <code>/rfqs</code> + copilot heuristics</td><td>Search-and-disambiguate RFQ resolution for queries like "the Aramco vessel RFQ" or "IF-25144." See §9.5 disambiguation.</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="color:var(--amber); margin-top:24px;">Group 3 — Local / capability tools</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:260px;">Tool</th>
+          <th style="width:150px;">Backing service</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>get_capability_status(topic)</code></td><td>(local)</td><td>The "speakable absence" tool — returns structured explanation of why a capability is absent and what it would need. Used by Pillar 4 graceful degradation (§8).</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout amber">
+      <span class="tag">Stretch tool — not core</span>
+      <p><strong><code>run_sandbox_scenario(rfq_id, mutation)</code></strong> — runs a what-if scenario against a copy of the RFQ context, returns the diff, never mutates state. HOTL posture. <strong>This is Priority 2 scope, not Priority 1.</strong> The mechanism and the HOTL guardrails are designed in this brief, but the tool itself is implemented only if time permits after the core Phase 1 list ships. The defense does not depend on this tool existing live on demo day (see §13 demo script, which uses a non-sandbox Beat 4).</p>
+    </div>
+
+    <!-- 9.5 DISAMBIGUATION -->
+    <h3>9.5 RFQ Disambiguation — Search, Don't Gate</h3>
+    <p>A recurring pattern in Global Copilot mode (and occasionally in RFQ mode when the user references another RFQ): the user names an RFQ and the copilot has to figure out which one they mean. <em>"Show me IF-25144,"</em> <em>"what stage is the Aramco vessel RFQ in?"</em>, <em>"how does this compare to the pressure vessel job from last quarter?"</em> These queries require RFQ <strong>resolution</strong> before any RFQ-scoped tool can be called.</p>
+
+    <div class="callout amber">
+      <span class="tag">Critical distinction</span>
+      <p><strong>Disambiguation is not HITL.</strong> HITL (human-in-the-loop) is for <em>state-changing actions</em> — saving, updating, sending. Disambiguation is for <em>understanding what the user meant</em>, which is a different concern entirely. If the copilot had to pause and ask "are you sure?" every time the user referenced an RFQ by name, the UX would be unusable. Instead, disambiguation is a runtime capability of the copilot itself, expressed through the intent layer and the <code>resolve_rfq_by_name</code> tool.</p>
+    </div>
+
+    <h4>The three-tier resolution pattern</h4>
+    <p>RFQ resolution follows a three-tier pattern based on the ambiguity of the user's reference. The tier is determined by the <code>resolve_rfq_by_name</code> tool, which performs a search against manager's RFQ list with appropriate heuristics:</p>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:140px;">Tier</th>
+          <th style="width:220px;">Condition</th>
+          <th>Copilot behavior</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Low ambiguity</strong> <span class="tag-pill tag-det">auto-pick</span></td>
+          <td>Exactly one match, or one match with a confidence score above the high-confidence threshold</td>
+          <td>Auto-pick the matched RFQ, state the assumption explicitly in the response, and proceed with the requested action. Example: <em>"I found RFQ IF-25144 — the Aramco pressure vessel project created on Feb 12. Here's the current stage..."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Medium ambiguity</strong> <span class="tag-pill tag-p1">suggest + confirm</span></td>
+          <td>One strong candidate and one or more weak alternatives, or one match below the high-confidence threshold</td>
+          <td>Suggest the most likely candidate, mention the alternatives briefly, let the user confirm. Example: <em>"I think you mean RFQ IF-25144 (Aramco pressure vessel, Feb 2026). There's also IF-24987 (Aramco heat exchanger) that might match. Which one did you have in mind?"</em></td>
+        </tr>
+        <tr>
+          <td><strong>High ambiguity</strong> <span class="tag-pill tag-hybrid">offer choices</span></td>
+          <td>Multiple comparable matches, or a broad descriptor like "the pressure vessel RFQ" with several plausible candidates</td>
+          <td>Offer 2–3 human-readable choices with enough metadata for the user to pick. Do not auto-pick. Example: <em>"Several RFQs match 'pressure vessel': (1) IF-25144 — Aramco Yanbu PV, Feb 2026; (2) IF-24987 — Aramco Jubail PV, Dec 2025; (3) IF-25031 — GHI internal PV redesign, Jan 2026. Which one?"</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>How it integrates with the intent layer</h4>
+    <div class="flow">Intent classifier detects <span class="s">rfq_resolution</span> intent, or any RFQ-specific
+intent when the conversation is not yet RFQ-bound (Mode B before pivot).
+
+Flow:
+
+  1. Extract the RFQ reference from the user turn (by name, by ID, by descriptor).
+  2. Call <span class="n">resolve_rfq_by_name(query)</span> — returns ranked candidates with confidence.
+  3. Determine tier from the ranking:
+       - 1 match at high confidence     → low ambiguity
+       - 1 match below threshold         → medium ambiguity
+       - 1 strong + weak alternatives    → medium ambiguity
+       - N comparable matches            → high ambiguity
+  4. Render according to tier (auto-pick, suggest+confirm, or offer choices).
+  5. If auto-picked or confirmed, pivot the session to <span class="s">rfq_bound</span> state
+     (Mode B → Mode A transition described in §4.2).</div>
+
+    <h4>Why this pattern is honest</h4>
+    <p>Two honest things about this design worth surfacing explicitly in the defense:</p>
+    <ul>
+      <li><strong>The copilot can be wrong about what the user meant, and that's fine.</strong> In the low-ambiguity tier, the copilot auto-picks and <em>states the assumption</em>. If the user meant a different RFQ, they correct the copilot and the conversation continues. The key is that the assumption is always visible — no silent picks.</li>
+      <li><strong>Cold-start affects this too.</strong> With only one real RFQ in the system (<code>IF-25144</code>), every reference trivially resolves to that one RFQ. The three-tier pattern is designed, tested with synthetic multi-RFQ fixtures, and ready to activate the moment real multi-RFQ data lands. This is flagged honestly in the Pillar 4 spirit — the capability exists; the data to stress-test it does not yet.</li>
+    </ul>
+
+    <div class="callout green">
+      <span class="tag">Defense paragraph</span>
+      <p>RFQ resolution is handled as a first-class runtime capability of the copilot, expressed through a three-tier search-and-disambiguate pattern (low / medium / high ambiguity) backed by the <code>resolve_rfq_by_name</code> tool. It is deliberately <em>not</em> a human-in-the-loop gate — HITL is reserved for state-changing actions, not for understanding what the user meant. Assumptions are always stated explicitly, so the user can correct a wrong pick. The pattern is validated against synthetic multi-RFQ fixtures in Phase 1 and activates naturally on real multi-RFQ data in Phase 2.</p>
+    </div>
+
+    <!-- 9.6 GUARDRAILS -->
+    <h3>9.6 Guardrails — Three Layers</h3>
+    <p>The guardrail stack has three layers, each enforcing a different concern. All three live in <code>controllers/guardrail_controller.py</code> and are applied on every turn.</p>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:160px;">Layer</th>
+          <th style="width:140px;">When</th>
+          <th>What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Input guardrails</strong></td>
+          <td>Before the LLM sees the message</td>
+          <td>(1) Intent classification: is this an in-scope RFQ question? (2) RFQ resolution: which RFQ does the user mean? (3) Basic PII / secret filter using Azure AI Content Safety. (4) Prompt-injection heuristics (detect "ignore previous instructions" patterns).</td>
+        </tr>
+        <tr>
+          <td><strong>Output guardrails</strong></td>
+          <td>After LLM generation, before user sees</td>
+          <td>(1) Grounding check: every numeric claim must have a <code>source_ref</code> nearby (Pillar 2). (2) Confidence check: qualifiers required for non-deterministic claims (Pillar 4). (3) Role check: no forbidden content for the current user's role (Pillar 3). Failures trigger retry-with-stricter-prompt (budget: 2 attempts).</td>
+        </tr>
+        <tr>
+          <td><strong>Action guardrails</strong></td>
+          <td>Before any state-changing tool runs</td>
+          <td>Phase 1 is read-only — no state-changing tools exist in Phase 1 tool list. The guardrail is <em>present but currently always rejecting</em>: any attempt to call a write-tool is blocked and logged. This gives us the HITL enforcement point ready for Phase 2 activation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>The safety posture — HOOTL / HOTL / HITL spectrum</h4>
+    <p>Action type determines the human-in-the-loop tier:</p>
+    <ul>
+      <li><strong>HOOTL (Human Out Of The Loop)</strong> — read-only queries. Fully autonomous. Examples: "what's the grand total?", "what stage is this in?", "show me the BOQ." The vast majority of Phase 1 queries.</li>
+      <li><strong>HOTL (Human On The Loop, stretch)</strong> — what-if scenario exploration. The agent runs freely against a <em>sandboxed copy</em> of the canonical profile, logs everything, never mutates real state. The human monitors via the audit log. Example: "what if labor costs go up 5%?"</li>
+      <li><strong>HITL (Human In The Loop)</strong> — state-changing actions. Require explicit confirmation, logged, subject to role check. <strong>Phase 1 exposes zero HITL actions.</strong> The enforcement mechanism is built and tested, but nothing calls it. Phase 2 will add the first mutations.</li>
+    </ul>
+
+    <div class="callout">
+      <span class="tag">Defense framing</span>
+      <p>The copilot's safety posture is a <strong>three-tier HITL/HOTL/HOOTL layering</strong> driven by action type, paired with grounded generation enforcing factual citations and confidence-aware rendering handling epistemic uncertainty. Phase 1 operates HOOTL (read) and optionally HOTL (what-if sandbox, stretch); HITL is implemented as a mechanism but gated closed — no state-changing actions are exposed to the LLM in Phase 1, by design.</p>
+    </div>
+
+    <!-- 9.7 DETERMINISM -->
+    <h3>9.7 Determinism — Structure Wherever Possible</h3>
+    <p>This family is where most of the engineering effort lives, even though it's the least glamorous. The principle: <em>LLMs are probabilistic, business systems aren't — force structure everywhere you can.</em></p>
+
+    <ul>
+      <li><strong>Structured outputs everywhere it's possible.</strong> Intent classification returns <code>{intent: enum, confidence: float, rfq_id: str | null}</code>. Tool argument generation is validated against Pydantic schemas. Final responses requiring post-processing (grounding, confidence) are generated with a structured envelope.</li>
+      <li><strong>Intent classification as the first step of every turn.</strong> This is non-negotiable. The LLM does not free-form its way through every request. Classify first (one cheap, structured LLM call), route based on classification, then generate. This alone eliminates a large class of "LLM did something weird" failures.</li>
+      <li><strong>Pydantic validation at every boundary.</strong> Inputs into the ContextBuilder, outputs from tools, responses from the LLM wherever a schema applies. Fail loud at the boundary, not silently later.</li>
+      <li><strong>Deterministic-first, LLM-second.</strong> Same principle as the intelligence service's parsers: if something can be answered by a database lookup, answer it by looking up the database. Reserve free-form LLM generation for the <em>narration</em> layer — turning structured tool results into natural language.</li>
+    </ul>
+
+    <!-- 9.8 EVALUATION -->
+    <h3>9.8 Evaluation — The Golden Set</h3>
+    <p>A small, well-curated evaluation suite is one of the highest-credibility-per-hour investments in the entire copilot build. It is non-negotiable for Phase 1 because it provides the empirical backing for every claim in this brief.</p>
+
+    <h4>What the suite looks like</h4>
+    <ul>
+      <li><strong>A <code>golden_set/</code> folder</strong> with hand-curated test cases derived from the real golden pair (<code>IF-25144.xls</code> + <code>SA-AYPP-6-MR-022</code>). Each case is a JSON with the fields below.</li>
+      <li><strong>A <code>pytest</code> harness</strong> that runs the copilot against each case and checks four things: (1) correct intent classification, (2) correct tool selection, (3) presence of required <code>source_ref</code> patterns in the response, (4) acceptable answer patterns (regex or LLM-as-judge).</li>
+      <li><strong>Correlation IDs and structured logs</strong> on every LLM call and tool call — reusing the H4 observability patterns already in manager.</li>
+      <li><strong>CI integration</strong> — the eval suite runs on every commit. No merge without green evals.</li>
+    </ul>
+
+    <h4>Case schema</h4>
+    <pre>{
+  <span class="s">"id"</span>: <span class="s">"g001_grand_total_deterministic"</span>,
+  <span class="s">"rfq_id"</span>: <span class="s">"IF-25144"</span>,
+  <span class="s">"role"</span>: <span class="s">"estimation_dept_lead"</span>,
+  <span class="s">"stage"</span>: <span class="s">"parsed"</span>,
+  <span class="s">"user_turn"</span>: <span class="s">"What's the grand total for IF-25144?"</span>,
+  <span class="s">"expected_intent"</span>: <span class="s">"rfq_factual"</span>,
+  <span class="s">"expected_tools"</span>: [<span class="s">"get_workbook_review"</span>],
+  <span class="s">"required_source_refs"</span>: [<span class="s">"IF-25144.xls"</span>, <span class="s">"Bid S"</span>],
+  <span class="s">"required_confidence"</span>: <span class="s">"deterministic"</span>,
+  <span class="s">"forbidden_patterns"</span>: [<span class="s">"approximately"</span>, <span class="s">"around"</span>, <span class="s">"roughly"</span>],
+  <span class="s">"acceptable_answer_pattern"</span>: <span class="s">"grand total.*1,?247,?350"</span>
+}</pre>
+
+    <h4>Case coverage targets</h4>
+    <p>Cases cover all four pillars, split roughly as: stage-appropriate behavior (3–4 stages × 2 cases), grounding enforcement (5 cases), role-aware answers (3 roles × 2 sensitive topics), confidence states (3 states × 2 cases), intent classification boundary cases (4–5 cases). The goal is a defensible <em>methodology</em>, not a comprehensive test matrix — we are cold-start on data, not cold-start on discipline.</p>
+
+    <div class="callout green">
+      <span class="tag">Honest scope</span>
+      <p>The golden set is <strong>validated against 1 sample</strong> — the same cold-start discipline applied everywhere else. The thesis framing is explicit: "This suite establishes the methodology and empirical backing for Phase 1. As real RFQ sessions accumulate, the suite expands following the same <em>validated_against: 1_sample → multi_sample</em> promotion policy used elsewhere in the platform."</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S10 — INTERNAL STRUCTURE (BACAB LAYERED) -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s10">
+    <div class="sh">
+      <div class="sh-num">Section 10</div>
+      <h2>Internal Structure — BACAB Layered Pattern</h2>
+      <p>Everything in this brief is organized in code following BACAB's canonical layered architecture: <code>routes → controllers → datasources / connectors</code>, with <code>models</code>, <code>translators</code>, <code>config</code>, and <code>utils</code> as support layers. The <code>services/</code> folder is used only when genuinely needed for complex internal orchestration.</p>
+    </div>
+
+    <h3>10.1 The canonical BACAB structure</h3>
+    <p>This is the house style. Every microservice in the platform follows it. <code>rfq_chatbot_ms</code> follows it without exception — no agent framework hijacks the request lifecycle, no framework magic owns the flow. The pattern is:</p>
+    <pre>HTTP Request
+     │
+     ▼
+routes/               <span class="c"># API layer — parse request, delegate to controller, format response</span>
+     │
+     ▼
+controllers/          <span class="c"># DOMAIN layer — business logic, orchestration, validation, decisions</span>
+     │
+     ▼
+translators/          <span class="c"># Convert between API shapes and internal / DB shapes</span>
+     │
+     ▼
+datasources/          <span class="c"># INFRASTRUCTURE layer — DB queries, internal persistence</span>
+connectors/           <span class="c"># External system connections (manager, intelligence, iam, Azure OpenAI)</span>
+     │
+     ▼
+models/               <span class="c"># Entities, DTOs, value objects</span>
+     │
+     ▼ (reverse through translators on the way back)
+     │
+HTTP Response</pre>
+
+    <h3>10.2 <code>src/</code> layout for <code>rfq_chatbot_ms</code></h3>
+    <p>Here is the frozen folder structure. Every file has a declared purpose. This is the structure the implementation blueprint (next document in the sequence) will reference.</p>
+
+    <pre>src/
+├── config/
+│   ├── settings.py                    <span class="c"># env vars, Azure OpenAI creds, feature flags, AUTH_BYPASS_* for local</span>
+│   ├── stage_config.py                <span class="c"># static stage_template_id → copilot config dict (Pillar 1, §5)</span>
+│   ├── role_config.py                 <span class="c"># static role → copilot config dict (Pillar 3, §7)</span>
+│   └── mode_config.py                 <span class="c"># mode → tool surface mapping (RFQ vs Global, §4)</span>
+│
+├── connectors/
+│   ├── manager_connector.py           <span class="c"># HTTP client for rfq_manager_ms (RFQs, stages, stats, analytics)</span>
+│   ├── intelligence_connector.py      <span class="c"># HTTP client for rfq_intelligence_ms (snapshot, briefing, workbook-review, etc.)</span>
+│   ├── iam_connector.py               <span class="c"># IAM seam — same path manager uses; target swaps to rfq_iam_ms in Phase 2</span>
+│   └── azure_openai_connector.py      <span class="c"># Azure OpenAI client (chat completions + embeddings + structured outputs)</span>
+│
+├── controllers/
+│   ├── chat_controller.py             <span class="c"># main entrypoint — orchestrates a full turn, drives mode-specific flow</span>
+│   ├── context_builder.py             <span class="c"># the ContextBuilder class (section 9.1)</span>
+│   ├── mode_controller.py             <span class="c"># Mode A/B resolution, mode pivot (portfolio → rfq_bound) — §4</span>
+│   ├── stage_controller.py            <span class="c"># Pillar 1 — manager-native stage resolution (§5)</span>
+│   ├── intent_controller.py           <span class="c"># intent classification (first step of every turn)</span>
+│   ├── disambiguation_controller.py   <span class="c"># §9.5 — three-tier RFQ name resolution (low/medium/high ambiguity)</span>
+│   ├── tool_controller.py             <span class="c"># tool selection, invocation, result handling</span>
+│   ├── grounding_controller.py        <span class="c"># Pillar 2 — output grounding guardrail + knowledge boundary routing</span>
+│   ├── role_controller.py             <span class="c"># Pillar 3 — role-aware prompt injection + output filter</span>
+│   ├── confidence_controller.py       <span class="c"># Pillar 4 — confidence-aware rendering + retry</span>
+│   ├── guardrail_controller.py        <span class="c"># input + action guardrails</span>
+│   └── conversation_controller.py     <span class="c"># episodic memory read/write, history compression</span>
+│
+├── datasources/
+│   ├── conversation_datasource.py     <span class="c"># chatbot_conversations table (Postgres)</span>
+│   ├── session_datasource.py          <span class="c"># session state (mode, rfq_id binding, role cache)</span>
+│   └── document_index_datasource.py   <span class="c"># pgvector index for MR document retrieval (exception path)</span>
+│
+├── models/
+│   ├── turn.py                        <span class="c"># TurnRequest, TurnResponse</span>
+│   ├── conversation.py                <span class="c"># Conversation, Message, ToolCall entities</span>
+│   ├── envelope.py                    <span class="c"># ToolResultEnvelope, SourceRef, ConfidenceLevel</span>
+│   ├── session.py                     <span class="c"># Session (mode ∈ {rfq_bound, portfolio, pending_pivot}), RoleContext</span>
+│   └── prompt.py                      <span class="c"># PromptEnvelope (stable_prefix + variable_suffix)</span>
+│
+├── routes/
+│   ├── chat_routes.py                 <span class="c"># POST /conversations/{id}/turn, GET /conversations/{id}</span>
+│   ├── session_routes.py              <span class="c"># POST /sessions (accepts mode: rfq | global), GET /sessions/{id}</span>
+│   └── health_routes.py               <span class="c"># /health, /ready, /metrics (Prometheus)</span>
+│
+├── translators/
+│   ├── chat_translator.py             <span class="c"># API shape ↔ internal shape for turn request/response</span>
+│   ├── envelope_translator.py         <span class="c"># envelope ↔ LLM-consumable dict for tool results</span>
+│   └── history_translator.py          <span class="c"># DB rows ↔ compressed history block for prompt</span>
+│
+├── utils/
+│   ├── tokens.py                      <span class="c"># token counting, budget enforcement</span>
+│   ├── source_ref.py                  <span class="c"># source_ref rendering helpers</span>
+│   ├── correlation.py                 <span class="c"># correlation ID propagation (H4 reuse)</span>
+│   └── logging.py                     <span class="c"># structured logging setup</span>
+│
+├── tools/                             <span class="c"># MCP-shaped function-calling tools (section 9.4)</span>
+│   ├── common/
+│   │   ├── envelope.py                <span class="c"># ToolResultEnvelope base</span>
+│   │   └── decorators.py              <span class="c"># @tool decorator for Azure OpenAI registration</span>
+│   │
+│   │  <span class="c"># Group 1 — RFQ-scoped tools (Mode A, and Mode B after pivot)</span>
+│   ├── get_rfq_snapshot.py            <span class="c"># → intelligence /snapshot — the default read</span>
+│   ├── get_intelligence_briefing.py   <span class="c"># → intelligence /briefing</span>
+│   ├── get_workbook_review.py         <span class="c"># → intelligence /workbook-review</span>
+│   ├── get_workbook_profile.py        <span class="c"># → intelligence /workbook-profile</span>
+│   ├── get_rfq_profile.py             <span class="c"># → manager /rfqs/{id}</span>
+│   ├── get_rfq_stage.py               <span class="c"># → manager /rfqs/{id}/stages — Pillar 1</span>
+│   ├── search_mr_documents.py         <span class="c"># document RAG (exception path)</span>
+│   │
+│   │  <span class="c"># Group 2 — Portfolio tools (Mode B before pivot)</span>
+│   ├── list_rfqs.py                   <span class="c"># → manager /rfqs with filters</span>
+│   ├── get_rfq_stats.py               <span class="c"># → manager /rfqs/stats</span>
+│   ├── get_rfq_analytics.py           <span class="c"># → manager /rfqs/analytics</span>
+│   ├── resolve_rfq_by_name.py         <span class="c"># disambiguation (§9.5)</span>
+│   │
+│   │  <span class="c"># Group 3 — Local / capability tools</span>
+│   ├── get_capability_status.py       <span class="c"># the "speakable absence" tool — Pillar 4</span>
+│   │
+│   │  <span class="c"># Stretch only — not Priority 1</span>
+│   └── run_sandbox_scenario.py        <span class="c"># Priority 2 — HOTL sandbox, not core</span>
+│
+├── golden_set/                        <span class="c"># evaluation suite (section 9.8)</span>
+│   ├── cases/
+│   │   ├── g001_grand_total.json
+│   │   ├── g002_stage_aware.json
+│   │   ├── g003_role_estimation_lead.json
+│   │   ├── g004_role_executive.json
+│   │   ├── g005_confidence_absent.json
+│   │   ├── g006_knowledge_boundary_general.json
+│   │   ├── g007_knowledge_boundary_rfq_specific.json
+│   │   ├── g008_disambiguation_low.json
+│   │   └── ... (~20–30 cases total)
+│   ├── harness.py                     <span class="c"># pytest runner</span>
+│   └── judges.py                      <span class="c"># LLM-as-judge scoring helpers</span>
+│
+├── __init__.py
+├── app_context.py                     <span class="c"># DI / service registry (BACAB pattern)</span>
+└── app.py                             <span class="c"># application entry point</span></pre>
+
+    <h3>10.3 A note on <code>services/</code></h3>
+    <div class="callout">
+      <span class="tag">Per-service decision</span>
+      <p>BACAB's layered pattern treats <code>services/</code> as a layer whose <em>use</em> is a per-service decision. The current repositories illustrate the spectrum:</p>
+      <ul style="margin:6px 0 12px 16px;">
+        <li><code>rfq_manager_ms</code> uses <code>routes → controllers → datasources</code> directly. No <code>services/</code> folder. Controllers are the orchestration layer.</li>
+        <li><code>rfq_intelligence_ms</code> uses <code>routes → controllers → services → datasources/connectors</code>. The <code>services/</code> layer is a required boundary, because intelligence has complex internal orchestration (parsers, artifact assembly, async pipelines) that benefits from a dedicated layer between HTTP and persistence.</li>
+      </ul>
+      <p>For <code>rfq_chatbot_ms</code> in Phase 1, the required orchestration is simple enough to live in controllers — the pattern matches manager, not intelligence. Every operation has a clear single-controller home, and controllers are the orchestration layer. This is a <em>per-service decision</em>, not a BACAB-wide principle; if orchestration complexity grows in Phase 2 (for example, multi-turn scenario planning, async event-driven proactive pushes, or multi-source evidence combination), a <code>services/</code> layer can be introduced later following intelligence's pattern without disrupting the rest of the architecture.</p>
+      <p>The one immediately visible deviation from manager's layout is the <code>tools/</code> folder, which contains MCP-shaped function-calling tools. It sits alongside <code>controllers/</code> and <code>datasources/</code> as a dedicated concern because the tools are a distinct architectural surface — they are the LLM's view into the platform — and benefit from being organized together rather than scattered across controllers.</p>
+    </div>
+
+    <h3>10.4 The flow of a single conversational turn</h3>
+    <p>Here is what happens end-to-end when a user sends one message. Every box corresponds to a file in the structure above.</p>
+    <pre>USER TURN: "What's the margin on this RFQ?"
+  session_mode = rfq_bound, rfq_id = IF-25144, user = estimation_dept_lead
+ │
+ ▼
+routes/chat_routes.py                    <span class="c"># parse, extract auth context (IAM seam), build TurnRequest</span>
+ │
+ ▼
+controllers/chat_controller.py           <span class="c"># orchestrate the full turn</span>
+ │
+ ├──▶ controllers/mode_controller.py           <span class="c"># §4 — resolve session_mode (rfq_bound here, no pivot needed)</span>
+ │
+ ├──▶ controllers/guardrail_controller.py      <span class="c"># input guardrails: PII, injection, scope</span>
+ │
+ ├──▶ controllers/role_controller.py           <span class="c"># resolve role via connectors/iam_connector (IAM seam / bypass context)</span>
+ │
+ ├──▶ controllers/stage_controller.py          <span class="c"># Pillar 1 — fetch rfq_stage from manager, look up stage_template config</span>
+ │                                             <span class="c"># → active stage = "cost_analysis", allowed intents, relevant tools</span>
+ │
+ ├──▶ controllers/intent_controller.py         <span class="c"># Azure OpenAI call #1 — structured-output classification</span>
+ │                                             <span class="c"># → intent = "rfq_factual", topic = "margin"</span>
+ │                                             <span class="c"># knowledge boundary: RFQ-specific → tools required (not general_knowledge)</span>
+ │
+ ├──▶ controllers/conversation_controller.py   <span class="c"># load last N turns from datasources/conversation_datasource</span>
+ │
+ ├──▶ controllers/context_builder.py           <span class="c"># assemble PromptEnvelope (stable prefix + variable suffix)</span>
+ │                                             <span class="c"># role_framing injected (Pillar 3, §7)</span>
+ │                                             <span class="c"># stage_framing injected (Pillar 1, §5)</span>
+ │                                             <span class="c"># RFQ snapshot loaded via get_rfq_snapshot (default Mode A context)</span>
+ │
+ ├──▶ controllers/tool_controller.py           <span class="c"># Azure OpenAI call #2 — main generation with function calling</span>
+ │                                             <span class="c"># LLM picks tool: get_workbook_review(rfq_id="IF-25144")</span>
+ │         │
+ │         ▼
+ │    tools/get_workbook_review.py             <span class="c"># → connectors/intelligence_connector</span>
+ │                                             <span class="c">#   → GET /intelligence/v1/rfqs/IF-25144/workbook-review</span>
+ │                                             <span class="c"># returns ToolResultEnvelope {</span>
+ │                                             <span class="c">#   value: {...margin: 0.184, grand_total: 1247350, ...},</span>
+ │                                             <span class="c">#   source_ref: {system: "intelligence",</span>
+ │                                             <span class="c">#                artifact: "IF-25144.xls",</span>
+ │                                             <span class="c">#                locator: "Bid S sheet, cells G47,G52"},</span>
+ │                                             <span class="c">#   confidence: "deterministic",</span>
+ │                                             <span class="c">#   validated_against: "1_sample"</span>
+ │                                             <span class="c"># }</span>
+ │
+ ├──▶ controllers/tool_controller.py           <span class="c"># Azure OpenAI call #3 — final narration with tool result</span>
+ │                                             <span class="c"># LLM renders answer with inline source_ref</span>
+ │
+ ├──▶ controllers/grounding_controller.py      <span class="c"># Pillar 2 (§6) — verify source_refs present near numeric claims</span>
+ │
+ ├──▶ controllers/confidence_controller.py     <span class="c"># Pillar 4 (§8) — verify confidence qualifiers match envelope</span>
+ │
+ ├──▶ controllers/role_controller.py           <span class="c"># Pillar 3 (§7) — output filter: no forbidden content for estimation_dept_lead</span>
+ │
+ ├──▶ controllers/conversation_controller.py   <span class="c"># persist turn to datasources/conversation_datasource</span>
+ │
+ ▼
+routes/chat_routes.py                    <span class="c"># format TurnResponse, return JSON</span>
+ │
+ ▼
+USER RECEIVES:
+"The gross margin is 18.4% on a grand total of $1,247,350
+ [IF-25144.xls, Bid S sheet, cells G47 and G52].
+ Cost breakdown: materials 62%, labor 21%, overhead 11%, contingency 6%.
+ The margin is consistent with similar pressure-vessel jobs, though
+ historical benchmarking is not yet available — this is the first recorded
+ Aramco PV RFQ of this class. Would you like to drill into the Mat Break-up
+ sheet to review material cost drivers?"</pre>
+
+    <div class="callout purple">
+      <span class="tag">Read this carefully</span>
+      <p>Three Azure OpenAI calls per turn — intent classification, main generation with tool calling, final narration with tool result — is the expected shape. The first is cheap and deterministic. The second and third benefit from <strong>prompt caching on the stable prefix</strong>, which is typically 2,200–2,400 tokens (system prompt + role framing + stage framing + tool definitions). Azure OpenAI automatically caches that prefix across calls within the same conversation, so we pay full price only on the first turn and drastically reduced price on subsequent turns of the same conversation.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S11 — DECISION LOG -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s11">
+    <div class="sh">
+      <div class="sh-num">Section 11</div>
+      <h2>Decision Log</h2>
+      <p>Every major architectural decision in this brief, with the chosen option, the rejected alternatives, and the reasoning. This is the section the jury will probe during the defense; every row here is a potential question and a prepared answer.</p>
+    </div>
+
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th style="width:200px;">Decision</th>
+          <th style="width:200px;">Chosen</th>
+          <th>Rejected alternatives and why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>D1</strong></td>
+          <td>What the copilot <em>is</em></td>
+          <td>Workflow-constrained conversational copilot, <strong>one service, two modes</strong></td>
+          <td>Rejected: LLM-as-orchestrator (BACAB real-estate pattern) — works for low-stakes, fails for high-stakes industrial bids. Rejected: fully autonomous multi-agent system — premature given cold-start data, time budget, and lack of genuine need. Rejected: one service per surface (embedded vs portfolio) — multiplies coordination cost with no architectural benefit.</td>
+        </tr>
+        <tr>
+          <td><strong>D2</strong></td>
+          <td>Agent architecture pattern</td>
+          <td>Plain-Python state machine in controllers</td>
+          <td><strong>Rejected for this service, this phase</strong> — not universally: LangGraph, LangChain, LangSmith, Langflow. LangGraph is a valid pattern elsewhere, but this copilot's workflow control is small and explicit; a plain-Python state machine is cheaper to test, explain, and maintain. If orchestration complexity grows in Phase 2 (parallel branches, retry graphs, compensating actions), LangGraph becomes a reasonable migration target.</td>
+        </tr>
+        <tr>
+          <td><strong>D3</strong></td>
+          <td>Tool interface</td>
+          <td>MCP-shaped function calling over real intelligence/manager endpoints</td>
+          <td>Rejected: full native MCP — requires MCP adapter in front of manager (C4 violation), OAuth 2.1 auth still maturing. Rejected: plain function calling without MCP framing — loses architectural differentiator. Tools wrap <em>real</em> intelligence endpoints (<code>/snapshot</code>, <code>/briefing</code>, <code>/workbook-review</code>) and manager endpoints, not abstracted placeholders.</td>
+        </tr>
+        <tr>
+          <td><strong>D4</strong></td>
+          <td>Memory architecture</td>
+          <td>Working + episodic (Postgres), no frameworks</td>
+          <td>Rejected: Mem0 / MemMachine — framework overhead, learning curve, unnecessary for cold-start. Rejected: full 4-layer memory — semantic/procedural consolidation needs real data, would be overclaiming (C3).</td>
+        </tr>
+        <tr>
+          <td><strong>D5</strong></td>
+          <td>Retrieval strategy</td>
+          <td><strong>Intelligence snapshot first, manager stats for portfolio, document RAG as exception</strong></td>
+          <td>Rejected: classic RAG across everything — wrong tool for structured data, hallucination risk. Rejected: GraphRAG — insufficient data (C3). Intelligence's <code>/snapshot</code> / <code>/briefing</code> / <code>/workbook-review</code> are the primary read surface because they are the service's declared consumer-facing read model. Document retrieval is the exception path.</td>
+        </tr>
+        <tr>
+          <td><strong>D6</strong></td>
+          <td>Grounding enforcement</td>
+          <td>Prompt + programmatic guardrail + retry, with explicit knowledge-boundary routing</td>
+          <td>Rejected: prompt-only grounding — silently fails under pressure. Rejected: force tools for every question — impossible (no tool returns "what PWHT means") and wasteful. The knowledge boundary (general concept → LLM may explain; specific project decision → tools required) is enforced by the intent classifier.</td>
+        </tr>
+        <tr>
+          <td><strong>D7</strong></td>
+          <td>Role model</td>
+          <td>RBAC + ABAC over the current IAM seam</td>
+          <td>Rejected: API-layer access control only — insufficient for generated content (the novelty). Rejected: waiting for a live <code>rfq_iam_ms</code> service — not shipped yet, would block the whole pillar. The current IAM seam (shared with manager, plus auth-bypass for local smoke tests) provides Phase 1 enforcement; a future <code>rfq_iam_ms</code> service is a swap of the connector target, not a rewrite. Phase 1 mandatory pair: <code>estimation_dept_lead</code> + <code>executive</code>. Optional stretch: <code>junior_engineer</code> restricted variant.</td>
+        </tr>
+        <tr>
+          <td><strong>D8</strong></td>
+          <td>Confidence classification authority</td>
+          <td><code>rfq_intelligence_ms</code> owns classification; copilot reads</td>
+          <td>Rejected: copilot decides confidence — would duplicate logic and risk drift. Rejected: hardcoded per-tool — inflexible. Intelligence already tracks <code>validated_against</code> metadata internally; the copilot receives it and renders accordingly.</td>
+        </tr>
+        <tr>
+          <td><strong>D9</strong></td>
+          <td>Safety posture</td>
+          <td>HOOTL / HOTL / HITL tiering by action type</td>
+          <td>Rejected: flat "always ask first" — too much friction for read-only queries. Rejected: flat "always autonomous" — unsafe for mutations. <strong>HITL is for state mutations, not for RFQ disambiguation</strong> (D17); conflating them would destroy the UX.</td>
+        </tr>
+        <tr>
+          <td><strong>D10</strong></td>
+          <td>Phase 1 write actions</td>
+          <td>Zero mutations exposed; HITL mechanism built but gated closed</td>
+          <td>Rejected: exposing some mutations in Phase 1 — would force us to build the full HITL UX, out of time budget. The gated-closed posture lets us ship the mechanism for Phase 2 without having to design its activation now.</td>
+        </tr>
+        <tr>
+          <td><strong>D11</strong></td>
+          <td>Evaluation methodology</td>
+          <td>Hand-curated golden set, ~20–30 cases, CI integrated</td>
+          <td>Rejected: large synthetic suite — cannot be honestly curated from 1 sample. Rejected: no evals — loses credibility signal. Small honest > large synthetic in a cold-start setting.</td>
+        </tr>
+        <tr>
+          <td><strong>D12</strong></td>
+          <td>Prompt layout</td>
+          <td>Stable prefix first (system + role + stage + tools); variable suffix last (profile + history + turn)</td>
+          <td>Rejected: unordered / ad-hoc — breaks Azure OpenAI prompt caching. This is not a runtime optimization but an architectural constraint on <code>ContextBuilder</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>D13</strong></td>
+          <td>Use of <code>services/</code> folder</td>
+          <td>Not used for Phase 1 — controllers are the orchestration layer</td>
+          <td>This is a <strong>per-service decision</strong>, not a BACAB-wide rule. <code>rfq_manager_ms</code> uses controllers directly (no services); <code>rfq_intelligence_ms</code> uses services as a required boundary (for parser pipelines). For <code>rfq_chatbot_ms</code> Phase 1, orchestration is simple enough to live in controllers — aligning with manager. Phase 2 may introduce <code>services/</code> if complexity grows.</td>
+        </tr>
+        <tr>
+          <td><strong>D14</strong></td>
+          <td><strong>Two-mode copilot design (§4)</strong></td>
+          <td>One service (<code>rfq_chatbot_ms</code>), two modes (RFQ Copilot + Global Copilot)</td>
+          <td>Rejected: one service per surface — duplicates engine, guardrails, evals, deployment. Rejected: one agent per RFQ — creates N-to-1 coordination. Rejected: only one mode (embedded) — blocks portfolio-level questions for executives and queue users. Chosen: mode is a runtime session attribute, not a deployment boundary. Pivoting from Global to RFQ-bound happens inside a single conversation.</td>
+        </tr>
+        <tr>
+          <td><strong>D15</strong></td>
+          <td><strong>Stage model authority (§5 Pillar 1)</strong></td>
+          <td>Manager-native <code>workflow</code> / <code>stage_template</code> / <code>rfq_stage</code> is the single source of truth</td>
+          <td>Rejected: abstract lifecycle enum invented by the copilot — would drift from manager's reality. Rejected: hardcoded stage labels — would break when workflows are reconfigured. The copilot reads manager's real schema; stage-specific copilot config is keyed on <code>stage_template</code> identifiers. Optional "conversational buckets" are non-authoritative UX framing only.</td>
+        </tr>
+        <tr>
+          <td><strong>D16</strong></td>
+          <td><strong>Knowledge boundary (§6 Pillar 2)</strong></td>
+          <td>General engineering knowledge: LLM may explain. RFQ-specific decisions: tools + sources required.</td>
+          <td>Rejected: force tools for every question — impossible and wasteful. Rejected: let LLM free-form everything — dangerous. The boundary is enforced by the intent classifier; <code>general_knowledge</code> intents bypass the tool layer, all other intents require at least one tool call before generation.</td>
+        </tr>
+        <tr>
+          <td><strong>D17</strong></td>
+          <td><strong>RFQ disambiguation (§9.5)</strong></td>
+          <td>Three-tier search-and-disambiguate pattern, <strong>not HITL</strong></td>
+          <td>Rejected: always ask the user to pick — unusable UX. Rejected: silent auto-pick with no confirmation — loses user trust when wrong. Chosen: tier based on match confidence (low = auto-pick and state assumption; medium = suggest + confirm; high = offer 2–3 choices). This is runtime understanding, not a safety gate.</td>
+        </tr>
+        <tr>
+          <td><strong>D18</strong></td>
+          <td><strong>Sandbox what-if scope</strong></td>
+          <td>Priority 2 / stretch only, not core Phase 1</td>
+          <td>Originally proposed as a core Pillar 4 tool, but intelligence brief v2 flags what-if as high-sensitivity and supportive-only. Moved to stretch scope to avoid the defense depending on a complex, high-risk feature. The HOTL mechanism is designed in this brief and activates cleanly in Phase 2 or late Phase 1 if time permits.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S12 — SCOPE & FUTURE WORK -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s12">
+    <div class="sh">
+      <div class="sh-num">Section 12</div>
+      <h2>Scope &amp; Future Work</h2>
+      <p>What Phase 1 ships. What Phase 2+ inherits. What is honorably dropped. This section exists so that the jury and BACAB stakeholders can verify that every claim in the brief corresponds to something buildable, and every deferred item has a clear reason.</p>
+    </div>
+
+    <h3>12.1 Phase 1 — What ships</h3>
+    <p>Phase 1 is organized into three priority tiers. Build top-to-bottom, drop from the bottom if time tightens.</p>
+
+    <h4>Priority 1 — Non-negotiable (the defensible core)</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:50px;">P1</th>
+          <th style="width:280px;">Capability</th>
+          <th>Reference</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>1</strong></td><td><code>ContextBuilder</code> with stable-prefix-first layout and token budgets</td><td>§9.1, D12</td></tr>
+        <tr><td><strong>2</strong></td><td><strong>Two-mode session model</strong> — <code>mode_controller.py</code>, <code>session_mode</code> ∈ {<code>rfq_bound</code>, <code>portfolio</code>, <code>pending_pivot</code>}; Mode B → Mode A pivot on RFQ resolution</td><td>§4, D14</td></tr>
+        <tr><td><strong>3</strong></td><td>Stage-aware controller reading manager-native <code>rfq_stage</code> / <code>stage_template</code> truth; <code>stage_config</code> keyed on real stage template identifiers</td><td>Pillar 1 §5, D15</td></tr>
+        <tr><td><strong>4</strong></td><td>Tool layer — ~10 MCP-shaped function-calling tools with Pydantic schemas, wrapping real <code>/snapshot</code>, <code>/briefing</code>, <code>/workbook-review</code>, manager stats/analytics, and local capability tools</td><td>§9.4, D3, D5</td></tr>
+        <tr><td><strong>5</strong></td><td>Tool envelope — every tool returns <code>ToolResultEnvelope</code> with <code>source_ref</code>, <code>confidence</code>, <code>validated_against</code></td><td>Pillar 2 §6, Pillar 4 §8, D8</td></tr>
+        <tr><td><strong>6</strong></td><td>Intent classification as first step of every turn, structured outputs, with <strong>knowledge-boundary routing</strong> (general vs RFQ-specific)</td><td>§6 Pillar 2, §9.7, D16</td></tr>
+        <tr><td><strong>7</strong></td><td>Grounded generation with provenance — prompt instruction + programmatic guardrail + retry</td><td>Pillar 2 §6, D6</td></tr>
+        <tr><td><strong>8</strong></td><td>Confidence-aware response rendering in system prompt + confidence guardrail</td><td>Pillar 4 §8</td></tr>
+        <tr><td><strong>9</strong></td><td><code>get_capability_status</code> tool — the "speakable absence" capability</td><td>Pillar 4 §8</td></tr>
+        <tr><td><strong>10</strong></td><td><strong>Role-aware generation — mandatory pair:</strong> <code>estimation_dept_lead</code> + <code>executive</code> fully implemented, 2–3 sensitive question families, identity via current IAM seam</td><td>Pillar 3 §7, D7</td></tr>
+        <tr><td><strong>11</strong></td><td><strong>RFQ disambiguation — three-tier pattern</strong> (low/medium/high ambiguity) via <code>resolve_rfq_by_name</code> and <code>disambiguation_controller.py</code></td><td>§9.5, D17</td></tr>
+        <tr><td><strong>12</strong></td><td>Episodic memory in Postgres — conversations table, scoped by <code>(user_id, rfq_id?)</code> — <code>rfq_id</code> nullable for portfolio sessions</td><td>§9.2, D4</td></tr>
+        <tr><td><strong>13</strong></td><td>HOOTL / HOTL / HITL layering — mechanisms in place, HITL gated closed in Phase 1 (no mutations exposed)</td><td>§9.6, D9, D10</td></tr>
+        <tr><td><strong>14</strong></td><td>Golden-set evaluation suite, CI integrated, covering stage behavior, grounding, confidence, role-awareness, knowledge boundary, and disambiguation</td><td>§9.8, D11</td></tr>
+        <tr><td><strong>15</strong></td><td>Correlation IDs and structured logs on every LLM and tool call (reuse manager H4 patterns)</td><td>§9.8</td></tr>
+        <tr><td><strong>16</strong></td><td>Stable-prefix layout that enables Azure OpenAI automatic prompt caching (measured)</td><td>§9.1, D12</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Priority 2 — Earn-extra-credit if time permits</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:50px;">P2</th>
+          <th style="width:280px;">Capability</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>17</strong></td><td><strong>Third restricted role</strong> — <code>junior_engineer</code> with forbidden-content path, extending Pillar 3 demo to three-way contrast</td><td>Tightens the Pillar 3 demo but not mandatory. If time tightens, the mandatory pair (<code>estimation_dept_lead</code> + <code>executive</code>) is enough.</td></tr>
+        <tr><td><strong>18</strong></td><td>Document retrieval path — <code>search_mr_documents</code> with pgvector, top-k</td><td>Activates only for document-intent queries (spec lookups, standards questions that require reading the actual MR package). Exception path, not core.</td></tr>
+        <tr><td><strong>19</strong></td><td><strong>What-if scenario sandboxing</strong> — <code>run_sandbox_scenario</code> with one concrete mutation type</td><td>Example: "labor costs ±X%." Transitions to HOTL posture. <strong>Explicitly not in the core demo script</strong> — the defense does not depend on this tool being live. D18.</td></tr>
+        <tr><td><strong>20</strong></td><td>LLM-as-judge evaluator layered on top of the golden set for grounding quality</td><td>Adds credibility to §9.8 methodology claim.</td></tr>
+        <tr><td><strong>21</strong></td><td>Proactive event subscription — subscribe to one lifecycle event (e.g., <code>rfq.parsing_complete</code>) and push one notification type</td><td>Good demo moment if shipped. Reuses manager H5 event bus.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Priority 3 — Only if everything else is genuinely done</h4>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:50px;">P3</th>
+          <th style="width:280px;">Capability</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>22</strong></td><td>Reranker on document retrieval (Cohere Rerank or local BGE)</td><td>10–20% quality bump on document RAG, but only matters if the document path is a significant demo beat.</td></tr>
+        <tr><td><strong>23</strong></td><td>Hybrid lexical + semantic search on the document path</td><td>Only useful if the MR package document corpus grows beyond the single golden sample.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>12.2 Phase 2 — Future work (named in thesis, not built)</h3>
+    <p>Every item below is explicitly flagged in the thesis "Future Work" chapter with a named condition for activation. None of them is vague. All of them inherit a buildable foundation from Phase 1.</p>
+    <ul>
+      <li><strong>Semantic and procedural memory layers</strong> — consolidation from accumulated episodic data. Activation condition: ≥50 real RFQ sessions recorded.</li>
+      <li><strong>Native MCP servers on manager and intelligence</strong>, with enterprise OAuth 2.1 auth. Activation condition: MCP spec Q2 2026 enterprise-auth milestone lands stably; BACAB evaluates MCP adoption across platform.</li>
+      <li><strong>Multi-agent split with A2A coordination</strong> — specialized sub-agents (pricing explainer, document navigator, orchestrator) communicating via agent-to-agent protocols. Activation condition: intelligence capabilities expand such that a single conversational orchestrator becomes a bottleneck.</li>
+      <li><strong>Azure OpenAI probabilistic intelligence enrichment</strong> — confidence scoring, conflict resolution, evidence-grounded briefing enrichment (cf. intelligence brief v2 Pipeline 2). Activation condition: ≥10 real MR packages parsed, enough to build a real eval set.</li>
+      <li><strong>Embeddings-based similarity across historical RFQs</strong> — find past projects "like this one." Activation condition: ≥20 historical RFQs in the system with outcomes recorded.</li>
+      <li><strong>Predictive win-probability</strong> — the final intelligence pillar. Activation condition: ≥30 historical RFQs with win/loss outcomes plus pricing outcomes.</li>
+      <li><strong>Self-evolving prompts / ACE-style context updates</strong> (Zhang et al. 2025 arXiv). Activation condition: research maturity + real usage data volume.</li>
+      <li><strong>Fine-tuning or DPO on collected preference data</strong> — improve model-level behavior on RFQ-specific patterns. Activation condition: ≥1000 real turns with thumbs-up/down feedback.</li>
+      <li><strong>Full proactive push conversational layer</strong> — wired into Teams, Slack, or email, driven by lifecycle events. Activation condition: Phase 1 proactive demo (P2 item 18) validated in production.</li>
+      <li><strong>Phase 2 HITL activation</strong> — the first state-changing action exposed (likely: saving a scenario as a named variant on the canonical profile). HITL mechanism already built and gated closed in Phase 1.</li>
+    </ul>
+
+    <h3>12.3 Honorably dropped — not for this project</h3>
+    <ul>
+      <li><strong>LangGraph framework</strong> — fights BACAB layered pattern; we reimplement the pattern in plain Python with the framework cited as the lineage.</li>
+      <li><strong>Langflow</strong> — visual pipeline builder, wrong shape for a production service in BACAB's house style.</li>
+      <li><strong>Self-hosted open models / RLHF / custom model training</strong> — we are on Azure OpenAI (C2), and cold-start data volume (C3) forbids serious preference learning.</li>
+      <li><strong>GraphRAG in Phase 1</strong> — insufficient corpus to make the graph meaningful.</li>
+      <li><strong>Full 4-layer memory architecture with automated consolidation</strong> — research project by itself, cold-start incompatible.</li>
+      <li><strong>A2A (Agent-to-Agent) protocols</strong> in Phase 1 — premature; the copilot is a single agent talking to services, not multiple agents coordinating.</li>
+      <li><strong>Mem0 / MemMachine frameworks</strong> — plain Postgres is more defensible for cold-start scope.</li>
+    </ul>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S13 — DEFENSE DEMO SCRIPT -->
+<!-- ============================================================ -->
+<div class="page">
+  <section id="s13">
+    <div class="sh">
+      <div class="sh-num">Section 13</div>
+      <h2>Defense Demo Script</h2>
+      <p>Five minutes on screen. A small number of questions chosen to exercise all four pillars visibly and verifiably. This is the part of the defense where the jury forms its lasting impression of the copilot — the entire architecture brief above exists to make these five minutes credible.</p>
+    </div>
+
+    <h3>13.1 The narrative arc</h3>
+    <p>The demo is not a random collection of queries. It tells a story in four beats, carefully sequenced so each beat introduces exactly one pillar visibly:</p>
+    <ol>
+      <li><strong>Beat 1 — "The copilot knows what it knows."</strong> Deterministic answer to a deterministic question. Pillar 2 (grounding) and Pillar 4 state A in action.</li>
+      <li><strong>Beat 2 — "The copilot knows when it's inferring."</strong> Pattern-based answer with explicit qualifier. Pillar 4 state B in action.</li>
+      <li><strong>Beat 3 — "The copilot knows what it doesn't know."</strong> Honest absence with named future condition. Pillar 4 state C in action — the killer move.</li>
+      <li><strong>Beat 4 — "The copilot respects who's asking."</strong> Same RFQ, same question, two authenticated sessions as two different users, two different role-appropriate answers. Pillar 3 in action — the most memorable moment.</li>
+    </ol>
+    <p>Beats 1–3 take roughly 60 seconds each, all in one conversation as the Estimation Department Lead. Beat 4 takes 90 seconds and requires opening a <em>second browser session</em> — a second authenticated user context — because role in this system is a property of authenticated identity, not a runtime parameter that can be flipped mid-conversation. Plus a 30-second framing preamble and a 30-second closing. Total: ~5 minutes.</p>
+    <p>Pillar 1 (stage-aware) is demonstrated implicitly throughout — the copilot's answers are shaped by the fact that <code>IF-25144</code> is in a parsing / review stage, and the system prompt framing reflects that. The jury can verify it by checking the request/response telemetry if they wish.</p>
+
+    <h3>13.2 The script</h3>
+
+    <div class="demo-box">
+      <div class="demo-step">
+        <div class="demo-num">0</div>
+        <div>
+          <div class="demo-q">[Preamble — 30 seconds]</div>
+          <div class="demo-a">"I'm going to ask the RFQ Copilot four questions. The first three, I'll ask as the <strong>Estimation Department Lead</strong>, logged into RFQ IF-25144 in the cost-analysis stage. For the fourth, I'll open a second session as an <strong>Executive</strong> user and ask the same question, to show how the copilot shapes the same data differently for different roles. Watch what the copilot does and doesn't say, and why." <em>Open the copilot panel inside the RFQ IF-25144 detail page; confirm the authenticated user visible in the header.</em></div>
+        </div>
+      </div>
+
+      <div class="demo-step">
+        <div class="demo-num">1</div>
+        <div>
+          <div class="demo-q">"What's the grand total for IF-25144?"</div>
+          <div class="demo-a">
+            <strong>Expected response:</strong> "The grand total is $1,247,350 <em>[IF-25144.xls, Bid S sheet, cell G47, parsed 2026-04-12]</em>."<br>
+            <strong>What to point out:</strong> "Notice the inline source reference. That's not decoration — it's enforced by a post-processor. Every numeric claim gets a citation, or the copilot doesn't ship the answer. The tool that returned this value was <code>get_workbook_review</code>, which calls intelligence's <code>/workbook-review</code> endpoint — the consumer-facing read model. The copilot never reaches into parsers directly." <span class="demo-tag tag-det">Pillars 2 + 4-A</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-step">
+        <div class="demo-num">2</div>
+        <div>
+          <div class="demo-q">"Is this an Aramco pressure vessel project?"</div>
+          <div class="demo-a">
+            <strong>Expected response:</strong> "Based on document keywords found in folder 06 Standards (SAES-D-001, SAMSS-057), this appears to be an Aramco pressure vessel project <em>(pattern-based, validated against 1 sample)</em>."<br>
+            <strong>What to point out:</strong> "The copilot has inferred this from observable patterns, but it's explicit that the detection rule has only been validated against one sample. It's not claiming certainty — and that qualifier is also enforced by the confidence guardrail. If the rule ever fires on a non-Aramco project, the cost is one slightly awkward sentence, not a silent wrong answer." <span class="demo-tag tag-p1">Pillar 4-B</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-step">
+        <div class="demo-num">3</div>
+        <div>
+          <div class="demo-q">"What's our typical win rate on projects like this?"</div>
+          <div class="demo-a">
+            <strong>Expected response:</strong> "Historical win-rate benchmarking isn't available yet — this is the first recorded Aramco pressure-vessel RFQ of this class in the system. Once outcomes are recorded on ≥5 similar projects, I'll be able to compare win rates. For now, I can show you the raw parsed values without a historical baseline."<br>
+            <strong>What to point out:</strong> "This is the part of the architecture I want you to notice. The copilot isn't apologizing. It's not deflecting. It's naming what it doesn't know, <em>and</em> it's naming the exact condition under which the capability would exist. That's a contract with the future — and it doubles as a concrete business case for GHI to start recording outcome data systematically." <span class="demo-tag tag-abs">Pillar 4-C — the killer move</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-step">
+        <div class="demo-num">4</div>
+        <div>
+          <div class="demo-q">"What's the margin on this RFQ?" — asked twice, in two separate authenticated sessions</div>
+          <div class="demo-a">
+            <strong>Setup:</strong> First, still as Estimation Department Lead, ask the question. Then — and this is the key moment for the architectural point — <strong>open a new browser tab, sign in as a different user with the <code>executive</code> role, navigate to the same RFQ IF-25144, open the copilot, and ask the same question.</strong> Two authenticated sessions, two different users, same RFQ, same underlying data.<br><br>
+
+            <strong>First response (Estimation Department Lead session):</strong> "The gross margin is 18.4% on a grand total of $1,247,350 <em>[IF-25144.xls, Bid S sheet, cells G47 and G52]</em>. Cost breakdown: materials 62%, labor 21%, overhead 11%, contingency 6%. The margin is consistent with similar pressure-vessel jobs, though historical benchmarking isn't yet available — this is the first recorded Aramco PV RFQ of this class. Would you like to drill into the Mat Break-up sheet to review material cost drivers?"<br><br>
+
+            <strong>Second response (Executive session, same question, same RFQ):</strong> "Margin on this RFQ is <strong>healthy</strong> — approximately 18% <em>[IF-25144.xls, Bid S sheet]</em>. This puts GHI in a comfortable bid-strategy position: room to offer modest concessions if Aramco pushes back. Historical win-rate benchmarking isn't yet available for this project class — once 5+ similar outcomes are recorded, I'll be able to show comparative context."<br><br>
+
+            <strong>What to point out:</strong> "Same question, same RFQ, same underlying data — completely different framing. The Estimation Department Lead saw full cost mechanics because that's operationally what they need. The Executive saw bid-strategy framing because that's what <em>they</em> need. The copilot isn't just access-controlling API endpoints — it's shaping generated narration per role. That's a different problem from classical access control, and it requires its own enforcement layer. And notice: I didn't 'switch roles' inside one session — role in this system is a property of <strong>authenticated identity</strong>, resolved through the IAM seam. The second answer comes from a second session with a second authenticated user. That's the honest architectural story." <span class="demo-tag tag-det">Pillar 3 — the memorable moment</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-step">
+        <div class="demo-num">5</div>
+        <div>
+          <div class="demo-q">[Closing — 30 seconds]</div>
+          <div class="demo-a">"Four questions. Four pillars visible: grounding, stage awareness, role awareness, confidence-aware degradation. Every answer traceable back to the parser or the API. Nothing hallucinated. Nothing overclaimed. The cold-start data reality surfaced honestly in the third question as a design feature, not a wound. One service, two modes, many scoped conversations. That's the contribution."</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>13.3 Fallback script if time tightens</h3>
+    <div class="callout amber">
+      <span class="tag">If only 3 minutes</span>
+      <p>Drop question 2 (the pattern-based inference). Keep 1 (grounding), 3 (killer move), and 4 (the role contrast between Estimation Department Lead and Executive, which remains the single most memorable moment). This preserves the two most memorable beats at the cost of losing the Pillar 4-B demonstration. The thesis text can compensate by showing the State B example in the body of the defense presentation rather than live.</p>
+    </div>
+    <div class="callout">
+      <span class="tag">If a bonus minute remains</span>
+      <p>If the first four beats land in under 5 minutes, an optional bonus beat is the <strong>Global Copilot disambiguation moment</strong>: navigate to the dashboard, open the global copilot, type "show me the Aramco vessel RFQ" instead of a specific ID. The copilot runs the three-tier disambiguation (§9.5), auto-picks IF-25144 (low ambiguity — only one Aramco vessel in the system), states the assumption explicitly, and pivots into RFQ-bound mode. This showcases the two-mode design (§4) and the disambiguation pattern (§9.5) in one gesture. Only do this if you're confident in the time budget.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- VERDICT -->
+<!-- ============================================================ -->
+<div class="page">
+  <div class="verdict">
+    <h3>The Contribution</h3>
+    <p>
+      <code>rfq_chatbot_ms</code> is not a chat window with tools stapled on. It is a <span class="hl">context-engineered, stage-aware conversational copilot</span> that owns the concerns neither <code>rfq_manager_ms</code> nor <code>rfq_intelligence_ms</code> should own. It picks four well-known 2025–2026 patterns — workflow-constrained agents, grounded generation with provenance, role-aware generation over RBAC+ABAC, and confidence-aware graceful degradation — and <span class="hl">combines them coherently</span> in the specific constraints of industrial RFQ management with cold-start data.
+      <br><br>
+      The innovation is not in any single pillar. The innovation is in the <span class="hl">synthesis, the justification, and the honest scoping</span>. Every decision in this brief survives the ten filters. Every claim has an implementation. Every absence is named with the condition under which it would become presence. That is what a PFE thesis contribution looks like when the engineering is real.
+    </p>
+  </div>
+
+  <div class="footer-note">
+    GHI × Albassam Group · RFQ Lifecycle Intelligence Platform<br>
+    rfq_chatbot_ms — Architecture Brief v2 F · April 2026 · Frozen for implementation<br>
+    <span style="color:var(--blue);">Prepared by Guidara — BACAB Consulting · Confidential</span>
+  </div>
+</div>
+
+</body>
+</html>

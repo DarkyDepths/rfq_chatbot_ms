@@ -8,7 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+from src import models as _models  # noqa: F401
 from src.app import create_app
 from src.database import Base
 from src.database import get_db
@@ -16,7 +18,11 @@ from src.database import get_db
 
 @pytest.fixture
 def db_engine():
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(bind=engine)
     try:
         yield engine
@@ -52,4 +58,3 @@ def app(db_session):
 def client(app):
     with TestClient(app) as test_client:
         yield test_client
-

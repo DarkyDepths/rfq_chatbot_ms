@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.config.settings import settings
+from src.utils.errors import AppError
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,13 @@ def create_app() -> FastAPI:
             content={"detail": "Validation failed: " + " | ".join(error_msgs)},
         )
 
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+        )
+
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         logger.exception("Unhandled exception during request", exc_info=exc)
@@ -52,12 +60,14 @@ def create_app() -> FastAPI:
         )
 
     from src.routes.health_route import router as health_router
+    from src.routes.session_routes import router as session_router
     from src.routes.smoke_route import router as smoke_router
 
     app.include_router(health_router)
 
     v1 = APIRouter(prefix="/rfq-chatbot/v1")
     v1.include_router(smoke_router)
+    v1.include_router(session_router)
     app.include_router(v1)
 
     return app
