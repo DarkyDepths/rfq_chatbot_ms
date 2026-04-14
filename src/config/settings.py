@@ -13,7 +13,23 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = False
     CORS_ORIGINS: str = "*"
 
-    model_config = SettingsConfigDict(env_file=".env")
+    AZURE_OPENAI_ENDPOINT: str = ""
+    AZURE_OPENAI_API_KEY: str = ""
+    AZURE_OPENAI_API_VERSION: str = "2024-10-21"
+    AZURE_OPENAI_CHAT_DEPLOYMENT: str = ""
+    AZURE_OPENAI_INTENT_DEPLOYMENT: str = ""
+
+    MANAGER_BASE_URL: str = ""
+    INTELLIGENCE_BASE_URL: str = ""
+    IAM_SERVICE_URL: str = ""
+
+    AUTH_BYPASS_ENABLED: bool = False
+    AUTH_BYPASS_USER_ID: str = "v1-demo-user"
+    AUTH_BYPASS_USER_NAME: str = "System"
+    AUTH_BYPASS_ROLE: str = "estimation_dept_lead"
+    AUTH_BYPASS_DEBUG_HEADERS_ENABLED: bool = False
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 def build_settings(env_file: str | None = ".env") -> Settings:
