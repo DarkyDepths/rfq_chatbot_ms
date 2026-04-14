@@ -7,8 +7,14 @@ import uuid
 from sqlalchemy.orm import Session
 
 from src.datasources.session_datasource import SessionDatasource
-from src.models.session import ChatbotSession, ChatbotSessionCreate, SessionMode
-from src.translators.chat_translator import SessionBindRequest, SessionCreateRequest
+from src.models.session import (
+    ChatbotSession,
+    ChatbotSessionCreate,
+    SessionBindCommand,
+    SessionCreateCommand,
+    SessionEntryMode,
+    SessionMode,
+)
 from src.utils.errors import ConflictError, NotFoundError, UnprocessableEntityError
 
 
@@ -25,12 +31,12 @@ class ModeController:
         self.session = session
         self.default_role = default_role
 
-    def create_session(self, request: SessionCreateRequest) -> ChatbotSession:
-        internal_mode = self.resolve_creation_mode(request.mode, request.rfq_id)
-        role = (request.role or self.default_role).strip()
+    def create_session(self, command: SessionCreateCommand) -> ChatbotSession:
+        internal_mode = self.resolve_creation_mode(command.entry_mode, command.rfq_id)
+        role = (command.role or self.default_role).strip()
         payload = ChatbotSessionCreate(
-            user_id=request.user_id.strip(),
-            rfq_id=request.rfq_id.strip() if request.rfq_id else None,
+            user_id=command.user_id.strip(),
+            rfq_id=command.rfq_id.strip() if command.rfq_id else None,
             mode=internal_mode,
             role=role,
         )
@@ -48,11 +54,11 @@ class ModeController:
     def bind_session_to_rfq(
         self,
         session_id: uuid.UUID,
-        request: SessionBindRequest,
+        command: SessionBindCommand,
     ) -> ChatbotSession:
         chatbot_session = self.get_session(session_id)
         target_mode = SessionMode.RFQ_BOUND
-        requested_rfq_id = request.rfq_id.strip()
+        requested_rfq_id = command.rfq_id.strip()
 
         if chatbot_session.rfq_id:
             raise ConflictError(
@@ -70,10 +76,14 @@ class ModeController:
         self.session.refresh(chatbot_session)
         return chatbot_session
 
-    def resolve_creation_mode(self, external_mode: str, rfq_id: str | None) -> SessionMode:
+    def resolve_creation_mode(
+        self,
+        entry_mode: SessionEntryMode,
+        rfq_id: str | None,
+    ) -> SessionMode:
         normalized_rfq_id = rfq_id.strip() if rfq_id else None
 
-        if external_mode == "rfq":
+        if entry_mode == SessionEntryMode.RFQ:
             if not normalized_rfq_id:
                 raise UnprocessableEntityError(
                     "rfq_id is required when mode is 'rfq'"

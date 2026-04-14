@@ -20,6 +20,13 @@ class SessionMode(str, Enum):
     PENDING_PIVOT = "pending_pivot"
 
 
+class SessionEntryMode(str, Enum):
+    """External business entry modes accepted during session creation."""
+
+    RFQ = "rfq"
+    GLOBAL = "global"
+
+
 class ChatbotSession(Base):
     """Conversation scope persisted for future chat turns."""
 
@@ -67,6 +74,25 @@ class ChatbotSessionCreate(BaseModel):
     rfq_id: str | None = None
     mode: SessionMode
     role: str = Field(min_length=1)
+
+
+class SessionCreateCommand(BaseModel):
+    """Domain command for creating a chatbot session."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    user_id: str = Field(min_length=1)
+    entry_mode: SessionEntryMode
+    rfq_id: str | None = None
+    role: str | None = None
+
+
+class SessionBindCommand(BaseModel):
+    """Domain command for binding a session to one RFQ."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    rfq_id: str = Field(min_length=1)
 
 
 class ChatbotSessionRead(BaseModel):

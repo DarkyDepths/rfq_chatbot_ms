@@ -3,8 +3,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from src.config.settings import settings
+from src.config.settings import get_settings
 
+
+settings = get_settings()
 
 engine = create_engine(
     settings.DATABASE_URL,
@@ -26,4 +28,3 @@ def get_db():
         yield session
     finally:
         session.close()
-

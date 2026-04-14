@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.config.settings import settings
+from src.config.settings import get_settings
 from src.utils.errors import AppError
 
 
@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+
+    settings = get_settings()
 
     app = FastAPI(
         title="rfq_chatbot_ms",

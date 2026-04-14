@@ -52,7 +52,14 @@ class Conversation(Base):
 
 
 class Message(Base):
-    """A persisted conversational turn entry."""
+    """A persisted conversational turn entry.
+
+    Phase 2 keeps this table normalized on purpose: message scope is recovered
+    through ``conversation_id -> chatbot_conversations.session_id ->
+    chatbot_sessions.(user_id, rfq_id)``. The implementation plan's table map
+    defines a thin conversation table plus core message fields only, so we
+    defer denormalized copies until a real query pattern justifies them.
+    """
 
     __tablename__ = "chatbot_messages"
     __table_args__ = (

@@ -1,5 +1,7 @@
 """Application settings loaded from environment variables."""
 
+from functools import lru_cache
+
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
@@ -63,4 +65,8 @@ def build_settings(env_file: str | None = ".env") -> Settings:
     return cfg
 
 
-settings = build_settings()
+@lru_cache
+def get_settings() -> Settings:
+    """Return the process-wide settings instance lazily."""
+
+    return build_settings()

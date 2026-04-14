@@ -1,31 +1,41 @@
 # rfq_chatbot_ms
 
-Phase-0 BACAB scaffold for the RFQ Copilot microservice. This service is intentionally minimal: it provides only the project structure, runtime bootstrap, and smoke endpoints needed before the real architecture brief is applied.
+Phase 2 foundation for the RFQ Copilot microservice. The service currently includes typed persistence contracts, Alembic migration support, and the two-mode session model. It does not yet include the Phase 3 turn pipeline, Azure OpenAI integration, tool execution, or downstream manager/intelligence connectors.
 
 ## Architecture
 
 ```text
-routes/          -> API endpoints
-controllers/     -> Reserved for later implementation
-datasources/     -> Reserved for later implementation
-translators/     -> Reserved for later implementation
-models/          -> Reserved for later implementation
+routes/          -> Health, smoke, and session HTTP endpoints
+controllers/     -> Session mode orchestration and transition rules
+datasources/     -> Session persistence CRUD
+translators/     -> Thin request/response translation for current session routes
+models/          -> Phase 1 typed contracts and ORM persistence models
 connectors/      -> Reserved for later implementation
 config/          -> Environment-backed settings
-utils/           -> Reserved for later implementation
+utils/           -> Shared application errors and future support utilities
 ```
 
-`services/` is intentionally omitted in Phase 0 because there is no real cross-controller business workflow yet.
+`services/` is still intentionally omitted. The current Phase 2 orchestration is small enough to stay controller-led and BACAB-aligned.
 
 ## Current Scope
 
 - FastAPI application factory
-- Fail-fast settings and database seam
+- Lazy settings access and SQLAlchemy database seam
+- Phase 1 models and initial Alembic migration
+- Phase 2 two-mode session behavior: `rfq_bound`, `portfolio`, `pending_pivot`
 - `GET /health`
 - `GET /rfq-chatbot/v1/smoke`
-- Minimal bootstrap tests and verification script
+- `POST /rfq-chatbot/v1/sessions`
+- `GET /rfq-chatbot/v1/sessions/{id}`
+- `POST /rfq-chatbot/v1/sessions/{id}/bind-rfq`
+- Unit and integration tests for the current slice
 
-This scaffold does not include real copilot logic, orchestration, seeded data, business models, tool layers, or frozen persistence models.
+This service does not yet include chat turns, Azure OpenAI runtime behavior, context building, conversation orchestration, tool execution, manager/intelligence connectors, or Phase 3+ guardrails.
+
+The architecture brief and staged implementation roadmap live in:
+
+- `docs/rfq_chatbot_ms_architecture_brief_v2_F.html`
+- `docs/implementation_plan_chatbot.md`
 
 ## Quick Start
 
@@ -37,14 +47,9 @@ uvicorn src.app:app --reload --port 8003
 ## Verification
 
 ```bash
-python scripts/verify.py
+ruff check .
+pytest
 ```
-
-The verifier runs:
-
-1. `ruff check src tests scripts`
-2. `pytest -q`
-3. startup/import sanity via `create_app()`
 
 ## Configuration
 
@@ -59,6 +64,7 @@ The verifier runs:
 
 ```text
 rfq_chatbot_ms/
+|-- docs/
 |-- src/
 |   |-- config/
 |   |-- connectors/
@@ -76,6 +82,8 @@ rfq_chatbot_ms/
 |-- tests/
 |   |-- integration/
 |   `-- unit/
+|-- migrations/
+|-- alembic.ini
 |-- requirements.txt
 |-- requirements-dev.txt
 `-- README.md

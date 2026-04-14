@@ -4,8 +4,7 @@ import pytest
 
 from src.controllers.mode_controller import ModeController
 from src.datasources.session_datasource import SessionDatasource
-from src.models.session import SessionMode
-from src.translators.chat_translator import SessionBindRequest, SessionCreateRequest
+from src.models.session import SessionBindCommand, SessionCreateCommand, SessionEntryMode, SessionMode
 from src.utils.errors import ConflictError, NotFoundError, UnprocessableEntityError
 
 
@@ -47,16 +46,16 @@ def test_validate_transition_rejects_portfolio_to_portfolio(mode_controller):
 
 def test_resolve_creation_mode_rejects_global_with_rfq_id(mode_controller):
     with pytest.raises(UnprocessableEntityError) as exc:
-        mode_controller.resolve_creation_mode("global", "IF-25144")
+        mode_controller.resolve_creation_mode(SessionEntryMode.GLOBAL, "IF-25144")
 
     assert str(exc.value) == "rfq_id must be null when mode is 'global'"
 
 
 def test_bind_session_to_rfq_rejects_already_bound_session(mode_controller):
     chatbot_session = mode_controller.create_session(
-        SessionCreateRequest(
+        SessionCreateCommand(
             user_id="u1",
-            mode="rfq",
+            entry_mode=SessionEntryMode.RFQ,
             rfq_id="IF-25144",
         )
     )
@@ -64,7 +63,7 @@ def test_bind_session_to_rfq_rejects_already_bound_session(mode_controller):
     with pytest.raises(ConflictError) as exc:
         mode_controller.bind_session_to_rfq(
             chatbot_session.id,
-            SessionBindRequest(rfq_id="IF-99999"),
+            SessionBindCommand(rfq_id="IF-99999"),
         )
 
     assert (
@@ -75,9 +74,9 @@ def test_bind_session_to_rfq_rejects_already_bound_session(mode_controller):
 
 def test_bind_session_to_rfq_allows_pending_pivot_to_rfq_bound(mode_controller):
     chatbot_session = mode_controller.create_session(
-        SessionCreateRequest(
+        SessionCreateCommand(
             user_id="u1",
-            mode="global",
+            entry_mode=SessionEntryMode.GLOBAL,
         )
     )
     chatbot_session.mode = SessionMode.PENDING_PIVOT
@@ -85,7 +84,7 @@ def test_bind_session_to_rfq_allows_pending_pivot_to_rfq_bound(mode_controller):
 
     updated_session = mode_controller.bind_session_to_rfq(
         chatbot_session.id,
-        SessionBindRequest(rfq_id="IF-25144"),
+        SessionBindCommand(rfq_id="IF-25144"),
     )
 
     assert updated_session.mode == SessionMode.RFQ_BOUND

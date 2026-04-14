@@ -3,7 +3,7 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from src.config.settings import settings
+from src.config.settings import get_settings
 from src.controllers.mode_controller import ModeController
 from src.database import get_db
 from src.datasources.session_datasource import SessionDatasource
@@ -30,6 +30,8 @@ def get_mode_controller(
     db: Session = Depends(get_db),
 ) -> ModeController:
     """Build the Phase 2 mode controller for the current request."""
+
+    settings = get_settings()
 
     return ModeController(
         datasource=session_datasource,

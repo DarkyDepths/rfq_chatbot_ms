@@ -10,6 +10,8 @@ from src.models.session import ChatbotSessionRead
 from src.translators.chat_translator import (
     SessionBindRequest,
     SessionCreateRequest,
+    to_session_bind_command,
+    to_session_create_command,
     to_session_response,
 )
 
@@ -24,7 +26,7 @@ def create_session(
 ):
     """Create either an RFQ-bound or global session."""
 
-    return to_session_response(ctrl.create_session(body))
+    return to_session_response(ctrl.create_session(to_session_create_command(body)))
 
 
 @router.get("/{session_id}", response_model=ChatbotSessionRead)
@@ -45,4 +47,6 @@ def bind_session_to_rfq(
 ):
     """Perform the one-way portfolio-to-RFQ binding for this phase."""
 
-    return to_session_response(ctrl.bind_session_to_rfq(session_id, body))
+    return to_session_response(
+        ctrl.bind_session_to_rfq(session_id, to_session_bind_command(body))
+    )

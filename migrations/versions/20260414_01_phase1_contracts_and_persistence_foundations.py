@@ -1,5 +1,11 @@
 """Create Phase 1 chatbot session and conversation tables.
 
+The Phase 1/2 persistence model stays normalized intentionally: ``user_id`` and
+``rfq_id`` live on ``chatbot_sessions`` and are reached from messages through
+``conversation_id -> chatbot_conversations.session_id``. The implementation
+plan's Phase 1 table map defines thin conversation/message tables, so
+denormalized copies are deferred until a proven query need exists.
+
 Revision ID: 20260414_01
 Revises:
 Create Date: 2026-04-14 15:30:00

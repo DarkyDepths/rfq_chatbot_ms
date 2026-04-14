@@ -29,16 +29,6 @@ class SessionDatasource:
             .first()
         )
 
-    def update_mode(
-        self,
-        chatbot_session: ChatbotSession,
-        mode: SessionMode,
-    ) -> ChatbotSession:
-        chatbot_session.mode = mode
-        self.session.flush()
-        self.session.refresh(chatbot_session)
-        return chatbot_session
-
     def bind_rfq(
         self,
         chatbot_session: ChatbotSession,

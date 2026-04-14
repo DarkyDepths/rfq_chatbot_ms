@@ -8,6 +8,9 @@ from src.models.session import (
     ChatbotSessionCreate,
     ChatbotSessionRead,
     RoleContext,
+    SessionBindCommand,
+    SessionCreateCommand,
+    SessionEntryMode,
     SessionMode,
 )
 from src.models.turn import TurnRequest, TurnResponse
@@ -21,6 +24,9 @@ __all__ = [
     "Message",
     "PromptEnvelope",
     "RoleContext",
+    "SessionBindCommand",
+    "SessionCreateCommand",
+    "SessionEntryMode",
     "SessionMode",
     "SourceRef",
     "ToolCallRecord",
