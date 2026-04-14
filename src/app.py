@@ -20,7 +20,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="rfq_chatbot_ms",
         version="0.1.0",
-        description="RFQ chatbot Phase-0 bootstrap skeleton.",
+        description="RFQ chatbot service foundations.",
     )
 
     origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
