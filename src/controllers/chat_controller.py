@@ -48,7 +48,6 @@ class ChatController:
         conversation = self.conversation_controller.get_or_create_conversation_for_session(
             session.id
         )
-        self.conversation_controller.create_user_message(conversation.id, command.content)
         tool_call_records = self.tool_controller.maybe_execute_retrieval(
             session,
             command.content,
@@ -56,11 +55,13 @@ class ChatController:
 
         recent_messages = self.conversation_controller.get_recent_history(
             conversation.id,
-            self.context_builder.history_window_size,
+            max(self.context_builder.history_window_size - 1, 0),
         )
+        self.conversation_controller.create_user_message(conversation.id, command.content)
         prompt_envelope = self.context_builder.build(
             recent_messages,
             tool_call_records_to_prompt_blocks(tool_call_records),
+            latest_user_turn=command.content,
         )
         azure_messages = self._build_azure_messages(prompt_envelope)
         completion = self.azure_openai_connector.create_chat_completion(azure_messages)

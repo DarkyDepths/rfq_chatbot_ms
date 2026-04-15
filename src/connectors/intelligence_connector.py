@@ -188,7 +188,7 @@ class IntelligenceConnector:
         )
 
     def _get_json(self, path: str, *, not_found_message: str) -> dict:
-        if not self._base_url:
+        if self._client is None and not self._base_url:
             raise UpstreamServiceError("Intelligence service is not configured")
 
         try:

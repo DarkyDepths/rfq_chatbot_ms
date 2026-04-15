@@ -19,12 +19,20 @@ class ContextBuilder:
     history_window_size = 6
     total_budget = 4000
 
-    def build(self, recent_messages, retrieval_context_blocks=None) -> PromptEnvelope:
+    def build(
+        self,
+        recent_messages,
+        retrieval_context_blocks=None,
+        latest_user_turn: str | None = None,
+    ) -> PromptEnvelope:
         """Return the frozen PromptEnvelope contract for the current turn."""
 
         transcript_lines = ["Conversation history:"]
         for message in recent_messages:
             transcript_lines.append(f"{message.role}: {message.content}")
+
+        if latest_user_turn:
+            transcript_lines.append(f"user: {latest_user_turn}")
 
         if retrieval_context_blocks:
             transcript_lines.append("")

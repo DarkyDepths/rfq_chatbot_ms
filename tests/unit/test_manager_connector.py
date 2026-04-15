@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from src.connectors.manager_connector import ManagerConnector
+from src.config.settings import get_settings
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
 
 
@@ -121,3 +122,41 @@ def test_manager_connector_maps_malformed_payload():
         connector.get_rfq(rfq_id)
 
     assert str(exc.value) == "Manager service returned malformed RFQ detail payload"
+
+
+def test_manager_connector_uses_injected_client_without_manager_base_url(monkeypatch):
+    rfq_id = uuid.uuid4()
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "id": str(rfq_id),
+                "rfq_code": "IF-25144",
+                "name": "Boiler Upgrade",
+                "client": "Acme Industrial",
+                "status": "open",
+                "progress": 35,
+                "deadline": "2026-05-01",
+                "priority": "critical",
+                "owner": "Sarah",
+                "workflow_id": str(uuid.uuid4()),
+                "created_at": "2026-04-01T10:00:00Z",
+                "updated_at": "2026-04-10T10:00:00Z",
+            },
+        )
+
+    monkeypatch.delenv("MANAGER_BASE_URL", raising=False)
+    get_settings.cache_clear()
+    client = httpx.Client(
+        base_url="http://manager.test/rfq-manager/v1",
+        transport=httpx.MockTransport(handler),
+    )
+
+    try:
+        connector = ManagerConnector(client=client)
+        result = connector.get_rfq(rfq_id)
+    finally:
+        get_settings.cache_clear()
+
+    assert result.id == rfq_id

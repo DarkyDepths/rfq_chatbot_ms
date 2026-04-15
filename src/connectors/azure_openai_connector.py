@@ -66,13 +66,6 @@ class AzureOpenAIConnector:
                     payload["tools"] = tools
 
                 response = self._get_client().chat.completions.create(**payload)
-                assistant_text = (response.choices[0].message.content or "").strip()
-                if not assistant_text:
-                    raise UpstreamServiceError(
-                        "Azure OpenAI returned an empty assistant response"
-                    )
-
-                return ChatCompletionResult(assistant_text=assistant_text)
             except OpenAIRateLimitError as exc:
                 if attempt == self.max_rate_limit_retries:
                     raise RateLimitError(
@@ -83,10 +76,14 @@ class AzureOpenAIConnector:
                 raise UpstreamTimeoutError("Azure OpenAI request timed out") from exc
             except APIError as exc:
                 raise UpstreamServiceError("Azure OpenAI request failed") from exc
-            except UpstreamServiceError:
-                raise
-            except Exception as exc:
-                raise UpstreamServiceError("Azure OpenAI request failed") from exc
+            else:
+                assistant_text = (response.choices[0].message.content or "").strip()
+                if not assistant_text:
+                    raise UpstreamServiceError(
+                        "Azure OpenAI returned an empty assistant response"
+                    )
+
+                return ChatCompletionResult(assistant_text=assistant_text)
 
         raise RateLimitError("Azure OpenAI rate limit exceeded after retries")
 

@@ -7,6 +7,7 @@ from src.app_context import (
     get_manager_connector,
 )
 from src.connectors.azure_openai_connector import ChatCompletionResult
+from src.models.conversation import Message
 from src.connectors.intelligence_connector import (
     IntelligenceSnapshotArtifact,
     IntelligenceSnapshotContent,
@@ -329,6 +330,32 @@ def test_downstream_failure_is_surfaced_explicitly(client, app):
         _clear_phase4_dependencies(app)
 
 
+def test_downstream_failure_does_not_persist_user_message(client, app, db_session):
+    fake_azure = FakeAzureOpenAIConnector()
+    _override_phase4_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=FakeManagerConnector(fail=True),
+    )
+    rfq_id = str(uuid.uuid4())
+    try:
+        session_response = client.post(
+            "/rfq-chatbot/v1/sessions",
+            json={"mode": "rfq", "user_id": "chat-user", "rfq_id": rfq_id},
+        )
+        session_id = session_response.json()["id"]
+
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "Who owns this RFQ and when is the deadline?"},
+        )
+
+        assert response.status_code == 503
+        assert db_session.query(Message).count() == 0
+    finally:
+        _clear_phase4_dependencies(app)
+
+
 def test_retrieval_with_human_readable_rfq_code_fails_clearly(client, app):
     fake_azure = FakeAzureOpenAIConnector()
     _override_phase4_dependencies(app, azure_connector=fake_azure)
@@ -353,6 +380,27 @@ def test_retrieval_with_human_readable_rfq_code_fails_clearly(client, app):
         _clear_phase4_dependencies(app)
 
 
+def test_invalid_rfq_code_failure_does_not_persist_user_message(client, app, db_session):
+    fake_azure = FakeAzureOpenAIConnector()
+    _override_phase4_dependencies(app, azure_connector=fake_azure)
+    try:
+        session_response = client.post(
+            "/rfq-chatbot/v1/sessions",
+            json={"mode": "rfq", "user_id": "chat-user", "rfq_id": "IF-25144"},
+        )
+        session_id = session_response.json()["id"]
+
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "Who owns this RFQ and when is the deadline?"},
+        )
+
+        assert response.status_code == 422
+        assert db_session.query(Message).count() == 0
+    finally:
+        _clear_phase4_dependencies(app)
+
+
 def test_ambiguous_retrieval_request_fails_clearly(client, app):
     fake_azure = FakeAzureOpenAIConnector()
     _override_phase4_dependencies(app, azure_connector=fake_azure)
@@ -373,5 +421,50 @@ def test_ambiguous_retrieval_request_fails_clearly(client, app):
         assert response.json()["detail"] == (
             "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
         )
+    finally:
+        _clear_phase4_dependencies(app)
+
+
+def test_ambiguous_retrieval_failure_does_not_persist_user_message(client, app, db_session):
+    fake_azure = FakeAzureOpenAIConnector()
+    _override_phase4_dependencies(app, azure_connector=fake_azure)
+    rfq_id = str(uuid.uuid4())
+    try:
+        session_response = client.post(
+            "/rfq-chatbot/v1/sessions",
+            json={"mode": "rfq", "user_id": "chat-user", "rfq_id": rfq_id},
+        )
+        session_id = session_response.json()["id"]
+
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "Give me the current snapshot and deadline for this RFQ"},
+        )
+
+        assert response.status_code == 422
+        assert db_session.query(Message).count() == 0
+    finally:
+        _clear_phase4_dependencies(app)
+
+
+def test_unsupported_retrieval_failure_does_not_persist_user_message(client, app, db_session):
+    fake_azure = FakeAzureOpenAIConnector()
+    _override_phase4_dependencies(app, azure_connector=fake_azure)
+    rfq_id = str(uuid.uuid4())
+    try:
+        session_response = client.post(
+            "/rfq-chatbot/v1/sessions",
+            json={"mode": "rfq", "user_id": "chat-user", "rfq_id": rfq_id},
+        )
+        session_id = session_response.json()["id"]
+
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "What is the grand total of this RFQ?"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "This retrieval request is not supported in Phase 4 yet"
+        assert db_session.query(Message).count() == 0
     finally:
         _clear_phase4_dependencies(app)

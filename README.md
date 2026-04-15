@@ -69,6 +69,15 @@ Phase 4 retrieval is intentionally limited to RFQ-bound sessions whose stored `r
 is already the downstream RFQ UUID. Human-readable RFQ codes such as `IF-25144`
 are not resolved in this phase and will fail with an explicit `422`.
 
+Current Phase 4 retrieval is deterministic keyword-routed retrieval, not Azure
+function calling. This is an intentional Phase 4 stabilization choice: true
+LLM-driven tool selection is deferred to a later phase.
+
+After retrieval validation succeeds and the user message is persisted, an Azure
+completion failure may still leave a user-only turn in conversation history.
+This residual behavior is accepted for now because it matches standard chat retry
+semantics and avoids a broader transaction refactor in this stabilization pass.
+
 ## Verification
 
 ```bash

@@ -35,6 +35,5 @@ def get_conversation(
 ):
     """Read back persisted conversation history."""
 
-    conversation = ctrl.get_conversation(conversation_id)
-    messages = ctrl.get_messages(conversation_id)
+    conversation, messages = ctrl.get_conversation_with_messages(conversation_id)
     return to_conversation_read_response(conversation, messages)

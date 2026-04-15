@@ -30,6 +30,21 @@ def test_context_builder_keeps_system_prompt_in_stable_prefix():
     assert prompt.variable_suffix.splitlines()[0] == "Conversation history:"
 
 
+def test_context_builder_appends_latest_user_turn_before_assistant_marker():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="assistant", content="Earlier answer")],
+        latest_user_turn="Latest question",
+    )
+
+    assert "assistant: Earlier answer" in prompt.variable_suffix
+    assert "user: Latest question" in prompt.variable_suffix
+    lines = prompt.variable_suffix.splitlines()
+    assert lines[-2] == "user: Latest question"
+    assert lines[-1] == "assistant:"
+
+
 def test_context_builder_includes_retrieved_facts_after_history():
     builder = ContextBuilder()
 

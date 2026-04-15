@@ -52,3 +52,47 @@ What must be added in or after Phase 3:
 Direction:
 Phase 3 should add correlation-aware logging at the seams it introduces, but it
 should not block the first vertical slice on a full observability platform.
+
+## Phase 4 Retrieval Posture
+
+Decision:
+Keep the current Phase 4 retrieval path as deterministic keyword-routed
+retrieval, not Azure function calling.
+
+Why:
+The current retrieval slice is already wired end-to-end through real downstream
+connectors, typed envelopes, prompt context injection, and persisted source
+provenance. Reworking it into true LLM-driven function calling during a
+stabilization pass would reopen architectural scope and couple this repo to
+later intent-routing decisions that are not part of Phase 4.
+
+Accepted tradeoff:
+Current retrieval is explicit and predictable, but narrower than true function
+calling. The repo must describe it honestly so readers do not infer that Azure
+is already choosing and invoking tools on its own.
+
+What this means for the current baseline:
+- Keep `tool_controller.py` and the current retrieval tools as explicit routing.
+- Do not claim MCP-shaped or Azure function calling behavior yet.
+- Revisit true function calling only in a later phase when that change is
+  intentional rather than incidental to stabilization.
+
+## Phase 4 Turn Persistence Boundary
+
+Decision:
+During the stabilization pass, prevent pre-validation orphan user messages, but
+accept the narrower residual case where Azure failure can still leave a
+persisted user-only turn after validation succeeds.
+
+Why:
+The urgent defect is that unsupported or failed retrieval attempts currently
+persist user messages before validation/execution completes. Reordering
+validation ahead of persistence removes that contamination path with minimal
+risk, while a full single-transaction turn pipeline would be a broader refactor
+than this pass needs.
+
+Accepted tradeoff:
+If Azure fails after the user message is persisted, the user may see a normal
+chat-style retry situation where their sent message remains without an assistant
+reply. This is acceptable for now and should be revisited only when the turn
+pipeline grows more complex.

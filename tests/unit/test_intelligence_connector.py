@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from src.connectors.intelligence_connector import IntelligenceConnector
+from src.config.settings import get_settings
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
 
 
@@ -145,3 +146,51 @@ def test_intelligence_connector_maps_malformed_payload():
         connector.get_snapshot(rfq_id)
 
     assert str(exc.value) == "Intelligence service returned malformed snapshot payload"
+
+
+def test_intelligence_connector_uses_injected_client_without_base_url(monkeypatch):
+    rfq_id = uuid.uuid4()
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "id": str(uuid.uuid4()),
+                "rfq_id": str(rfq_id),
+                "artifact_type": "rfq_intelligence_snapshot",
+                "version": 1,
+                "status": "partial",
+                "is_current": True,
+                "content": {
+                    "artifact_meta": {
+                        "artifact_type": "rfq_intelligence_snapshot",
+                    },
+                    "rfq_summary": {},
+                    "intake_panel_summary": {"status": "available"},
+                    "briefing_panel_summary": {"status": "available"},
+                    "workbook_panel": {"status": "not_ready"},
+                    "review_panel": {"status": "not_ready"},
+                    "analytical_status_summary": {"status": "not_ready"},
+                    "outcome_summary": {"status": "not_recorded"},
+                    "consumer_hints": {},
+                    "overall_status": "partial",
+                },
+                "schema_version": "1.0",
+                "created_at": "2026-04-10T10:00:00Z",
+            },
+        )
+
+    monkeypatch.delenv("INTELLIGENCE_BASE_URL", raising=False)
+    get_settings.cache_clear()
+    client = httpx.Client(
+        base_url="http://intelligence.test/intelligence/v1",
+        transport=httpx.MockTransport(handler),
+    )
+
+    try:
+        connector = IntelligenceConnector(client=client)
+        result = connector.get_snapshot(rfq_id)
+    finally:
+        get_settings.cache_clear()
+
+    assert result.rfq_id == rfq_id

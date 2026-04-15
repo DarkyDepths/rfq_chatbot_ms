@@ -83,6 +83,35 @@ def test_azure_openai_connector_maps_generic_failure():
     assert str(exc.value) == "Azure OpenAI request failed"
 
 
+def test_azure_openai_connector_rejects_empty_assistant_response():
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="   "))]
+    )
+    connector = AzureOpenAIConnector(
+        client=_build_mock_client(response),
+        deployment_name="chat-deployment",
+        timeout_seconds=3.0,
+    )
+
+    with pytest.raises(UpstreamServiceError) as exc:
+        connector.create_chat_completion([{"role": "system", "content": "x"}])
+
+    assert str(exc.value) == "Azure OpenAI returned an empty assistant response"
+
+
+def test_azure_openai_connector_does_not_mask_programming_errors():
+    connector = AzureOpenAIConnector(
+        client=_build_mock_client(ValueError("bad response shape")),
+        deployment_name="chat-deployment",
+        timeout_seconds=3.0,
+    )
+
+    with pytest.raises(ValueError) as exc:
+        connector.create_chat_completion([{"role": "system", "content": "x"}])
+
+    assert str(exc.value) == "bad response shape"
+
+
 def test_azure_openai_connector_requires_configuration(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")

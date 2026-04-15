@@ -25,6 +25,8 @@ class ConversationController:
         return conversation
 
     def get_or_create_conversation_for_session(self, session_id: uuid.UUID) -> Conversation:
+        """Return the single Phase 3-4 conversation for this session."""
+
         conversation = self.datasource.get_conversation_by_session_id(session_id)
         if conversation:
             return conversation
@@ -33,6 +35,13 @@ class ConversationController:
         self.session.commit()
         self.session.refresh(conversation)
         return conversation
+
+    def get_conversation_with_messages(
+        self,
+        conversation_id: uuid.UUID,
+    ) -> tuple[Conversation, list[Message]]:
+        conversation = self.get_conversation(conversation_id)
+        return conversation, self.datasource.get_messages_by_conversation(conversation_id)
 
     def get_messages(self, conversation_id: uuid.UUID) -> list[Message]:
         self.get_conversation(conversation_id)

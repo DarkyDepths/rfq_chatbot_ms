@@ -1,4 +1,4 @@
-"""Minimal request/response translation for Phase 2 session routes."""
+"""Thin request/response translation for session and chat routes."""
 
 from __future__ import annotations
 
