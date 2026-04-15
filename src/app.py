@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="rfq_chatbot_ms",
         version="0.1.0",
-        description="RFQ chatbot service foundations.",
+        description="RFQ chatbot service with the Phase 4 typed retrieval baseline.",
     )
 
     origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
@@ -62,6 +62,7 @@ def create_app() -> FastAPI:
         )
 
     from src.routes.health_route import router as health_router
+    from src.routes.chat_routes import router as chat_router
     from src.routes.session_routes import router as session_router
     from src.routes.smoke_route import router as smoke_router
 
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
     v1 = APIRouter(prefix="/rfq-chatbot/v1")
     v1.include_router(smoke_router)
     v1.include_router(session_router)
+    v1.include_router(chat_router)
     app.include_router(v1)
 
     return app

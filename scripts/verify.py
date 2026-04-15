@@ -9,6 +9,18 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+ENV_WHITELIST = (
+    "PATH",
+    "HOME",
+    "USERPROFILE",
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "TMP",
+    "TEMP",
+)
 
 
 def _run_step(name: str, command: list[str], env: dict[str, str]) -> None:
@@ -19,10 +31,15 @@ def _run_step(name: str, command: list[str], env: dict[str, str]) -> None:
         raise SystemExit(completed.returncode)
 
 
+def _build_verify_env() -> dict[str, str]:
+    env = {key: value for key, value in os.environ.items() if key in ENV_WHITELIST}
+    env["PYTHONPATH"] = "."
+    env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "sqlite:///./.quality_gate.db")
+    return env
+
+
 def main() -> None:
-    env = os.environ.copy()
-    env.setdefault("PYTHONPATH", ".")
-    env.setdefault("DATABASE_URL", "sqlite:///./.quality_gate.db")
+    env = _build_verify_env()
 
     python = sys.executable
 
@@ -39,4 +56,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

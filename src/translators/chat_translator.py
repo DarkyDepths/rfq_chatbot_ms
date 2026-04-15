@@ -1,15 +1,23 @@
-"""Minimal request/response translation for Phase 2 session routes."""
+"""Thin request/response translation for session and chat routes."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.models.envelope import SourceRef
 from src.models.session import (
     ChatbotSession,
     ChatbotSessionRead,
     SessionBindCommand,
     SessionCreateCommand,
     SessionEntryMode,
+)
+from src.models.turn import (
+    ConversationMessageRead,
+    ConversationReadResponse,
+    TurnCreateCommand,
+    TurnRequest,
+    TurnResponse,
 )
 
 
@@ -53,3 +61,51 @@ def to_session_response(chatbot_session: ChatbotSession) -> ChatbotSessionRead:
     """Return the Phase 1 read DTO as the API response model."""
 
     return ChatbotSessionRead.model_validate(chatbot_session)
+
+
+def to_turn_create_command(request: TurnRequest) -> TurnCreateCommand:
+    """Translate the HTTP turn payload into a domain command."""
+
+    return TurnCreateCommand(content=request.content)
+
+
+def to_turn_response(
+    conversation_id,
+    assistant_message,
+) -> TurnResponse:
+    """Translate a persisted assistant message into the turn response contract."""
+
+    return TurnResponse(
+        conversation_id=conversation_id,
+        turn_number=assistant_message.turn_number,
+        role=assistant_message.role,
+        content=assistant_message.content,
+        source_refs=_to_source_refs(assistant_message.source_refs),
+    )
+
+
+def to_conversation_read_response(conversation, messages) -> ConversationReadResponse:
+    """Translate a conversation aggregate into the readback contract."""
+
+    return ConversationReadResponse(
+        conversation_id=conversation.id,
+        session_id=conversation.session_id,
+        messages=[
+            ConversationMessageRead(
+                id=message.id,
+                turn_number=message.turn_number,
+                role=message.role,
+                content=message.content,
+                source_refs=_to_source_refs(message.source_refs),
+                timestamp=message.timestamp,
+            )
+            for message in messages
+        ],
+    )
+
+
+def _to_source_refs(source_refs) -> list[SourceRef]:
+    if not source_refs:
+        return []
+
+    return [SourceRef.model_validate(source_ref) for source_ref in source_refs]

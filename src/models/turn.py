@@ -1,6 +1,7 @@
 """Turn request and response DTOs for future chat routes."""
 
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,7 +11,15 @@ from src.models.envelope import SourceRef
 class TurnRequest(BaseModel):
     """Minimal turn input contract."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    content: str = Field(min_length=1)
+
+
+class TurnCreateCommand(BaseModel):
+    """Domain command for handling one user turn."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     content: str = Field(min_length=1)
 
@@ -25,3 +34,26 @@ class TurnResponse(BaseModel):
     role: str = Field(min_length=1)
     content: str = Field(min_length=1)
     source_refs: list[SourceRef] = Field(default_factory=list)
+
+
+class ConversationMessageRead(BaseModel):
+    """Read model for one persisted conversation message."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    turn_number: int = Field(ge=1)
+    role: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+    source_refs: list[SourceRef] = Field(default_factory=list)
+    timestamp: datetime
+
+
+class ConversationReadResponse(BaseModel):
+    """Read model for full conversation history."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: uuid.UUID
+    session_id: uuid.UUID
+    messages: list[ConversationMessageRead] = Field(default_factory=list)

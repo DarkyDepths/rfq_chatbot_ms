@@ -1,4 +1,4 @@
-"""Namespaced smoke endpoint used for Phase-0 bootstrap verification."""
+"""Namespaced smoke endpoint used for baseline bootstrap verification."""
 
 from fastapi import APIRouter, Depends
 
