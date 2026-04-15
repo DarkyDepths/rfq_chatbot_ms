@@ -32,3 +32,24 @@ class ConflictError(AppError):
 
     status_code = 409
     message = "Conflict"
+
+
+class RateLimitError(AppError):
+    """429 for exhausted upstream rate-limit retries."""
+
+    status_code = 429
+    message = "Too many requests"
+
+
+class UpstreamTimeoutError(AppError):
+    """504 for upstream timeout failures."""
+
+    status_code = 504
+    message = "Upstream request timed out"
+
+
+class UpstreamServiceError(AppError):
+    """503 for upstream service failures."""
+
+    status_code = 503
+    message = "Upstream service failed"

@@ -13,13 +13,21 @@ from src.models.session import (
     SessionEntryMode,
     SessionMode,
 )
-from src.models.turn import TurnRequest, TurnResponse
+from src.models.turn import (
+    ConversationMessageRead,
+    ConversationReadResponse,
+    TurnCreateCommand,
+    TurnRequest,
+    TurnResponse,
+)
 
 __all__ = [
     "ChatbotSession",
     "ChatbotSessionCreate",
     "ChatbotSessionRead",
     "ConfidenceLevel",
+    "ConversationMessageRead",
+    "ConversationReadResponse",
     "Conversation",
     "Message",
     "PromptEnvelope",
@@ -30,6 +38,7 @@ __all__ = [
     "SessionMode",
     "SourceRef",
     "ToolCallRecord",
+    "TurnCreateCommand",
     "ToolResultEnvelope",
     "TurnRequest",
     "TurnResponse",
