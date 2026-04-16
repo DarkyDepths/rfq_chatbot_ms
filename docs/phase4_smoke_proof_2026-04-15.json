@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-04-15T18:30:18.489836Z",
+  "chatbot_base": "http://localhost:8003",
+  "intelligence_base": "http://localhost:18001",
+  "rfq_id": "bcd812b9-ef01-42bc-96b1-1422814caf6e",
+  "cases": [
+    {
+      "name": "intelligence_trigger_intake",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:18001/intelligence/v1/rfqs/bcd812b9-ef01-42bc-96b1-1422814caf6e/trigger/intake",
+        "body": null
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"status\":\"processed\",\"event_id\":\"manual-ui:rfq.created:6f248220-33ee-472f-a016-393d612bfee5\",\"event_type\":\"rfq.created\",\"rfq_id\":\"bcd812b9-ef01-42bc-96b1-1422814caf6e\",\"artifacts\":{\"rfq_intake_profile\":{\"id\":\"5ecae5ab-a025-4636-b505-eb45f1f570d4\",\"version\":4,\"status\":\"partial\"},\"intelligence_briefing\":{\"id\":\"1d28b7fd-44e9-48c9-a1a0-1d27bbacf4c5\",\"version\":4,\"status\":\"partial\"},\"rfq_analytical_record\":{\"id\":\"4361c005-0dbc-449a-be93-2aec41169331\",\"version\":4,\"status\":\"partial\"},\"rfq_intelligence_snapshot\":{\"id\":\"c21a4bda-1641-4bee-845f-d0e3d8ecb50f\",\"version\":4,\"status\":\"partial\"}}}"
+      }
+    },
+    {
+      "name": "plain_chat_session_create",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions",
+        "body": {
+          "mode": "global",
+          "user_id": "defense-user"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": "{\"id\":\"d651b470-8923-444b-a718-90a788929186\",\"user_id\":\"defense-user\",\"rfq_id\":null,\"mode\":\"portfolio\",\"role\":\"estimation_dept_lead\",\"created_at\":\"2026-04-15T18:30:21\",\"updated_at\":\"2026-04-15T18:30:21\"}"
+      }
+    },
+    {
+      "name": "plain_chat_turn",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions/d651b470-8923-444b-a718-90a788929186/turn",
+        "body": {
+          "content": "Hello copilot"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"conversation_id\":\"180ee6d9-71df-48e6-8fc3-805b6a390f88\",\"turn_number\":2,\"role\":\"assistant\",\"content\":\"Hello! I\u2019m RFQ Copilot. How can I help with your RFQ today?\\n\\nI can assist with:\\n- Scope clarification and questions to remove ambiguities\\n- Cost estimation (materials, labor, overhead, contingency)\\n- Bill of Materials (BoM) creation and validation\\n- Supplier quote requests and comparison\\n- Lead times, production capacity, and logistics considerations\\n- Risk flags and scenario analysis (e.g., batch size, tariffs, exchange rates)\\n\\nIf you have an RFQ document, you can share key details here. To get started, please provide:\\n- Project/asset description and item(s) requiring quotes\\n- Quantities and unit of measure\\n- Specifications, drawings, or standards to follow\\n- Required lead time and delivery location\\n- Incoterms and packaging requirements\\n- Any special tests, warranties, or quality requirements\\n- Budget or target cost, if available\\n- Any constraints or assumptions to consider\\n\\nWhat would you like to tackle first?\",\"source_refs\":[]}"
+      }
+    },
+    {
+      "name": "rfq_session_create",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions",
+        "body": {
+          "mode": "rfq",
+          "user_id": "defense-user",
+          "rfq_id": "bcd812b9-ef01-42bc-96b1-1422814caf6e"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": "{\"id\":\"f6344fba-07e5-4152-9ac8-3b3710e312dd\",\"user_id\":\"defense-user\",\"rfq_id\":\"bcd812b9-ef01-42bc-96b1-1422814caf6e\",\"mode\":\"rfq_bound\",\"role\":\"estimation_dept_lead\",\"created_at\":\"2026-04-15T18:30:36\",\"updated_at\":\"2026-04-15T18:30:36\"}"
+      }
+    },
+    {
+      "name": "manager_retrieval_turn",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions/f6344fba-07e5-4152-9ac8-3b3710e312dd/turn",
+        "body": {
+          "content": "What stage are we in?"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"conversation_id\":\"87c78e16-a963-4bc4-9284-a40ce9fff72f\",\"turn_number\":2,\"role\":\"assistant\",\"content\":\"Current RFQ stage: Preliminary design (Stage 4)\\n\\n- Status: In Progress\\n- Assigned team: Engineering\\n- Actual start: 2026-04-11\\n- Planned start / end: 2026-05-06 / 2026-05-11\\n- Progress: 0%\\n- Blockers: None reported\\n- Quick context: Earlier stages (RFQ received, Go/No-Go, Pre-bid clarifications) are Completed. The next stage is BOQ / BOM preparation (Not Started) after this.\",\"source_refs\":[{\"system\":\"rfq_manager_ms\",\"artifact\":\"rfq_stages\",\"locator\":\"/rfq-manager/v1/rfqs/bcd812b9-ef01-42bc-96b1-1422814caf6e/stages\",\"parsed_at\":null}]}"
+      }
+    },
+    {
+      "name": "intelligence_retrieval_turn",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions/f6344fba-07e5-4152-9ac8-3b3710e312dd/turn",
+        "body": {
+          "content": "Give me a current snapshot summary for this RFQ"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": "{\"conversation_id\":\"87c78e16-a963-4bc4-9284-a40ce9fff72f\",\"turn_number\":4,\"role\":\"assistant\",\"content\":\"Here\u2019s the current RFQ snapshot based on the retrieved facts.\\n\\nRFQ basics\\n- Client: GHI Strategic Systems\\n- Project title: Structured Power Redundancy Upgrade\\n- RFQ code: IF-0038\\n- RFQ ID: bcd812b9-ef01-42bc-96b1-1422814caf6e\\n- Stage: Preliminary design (Stage 4) \u2014 In Progress\\n- Actual start: 2026-04-11\\n- Planned start / end: 2026-05-06 / 2026-05-11\\n- Progress: 0%\\n- Blockers: None reported\\n- Next stage: BOQ / BOM preparation (Not Started)\\n\\nRFQ intelligence snapshot (highlights)\\n- Overall status: partial\\n- Requires human review: true\\n- Generated at: 2026-04-15T18:30:19Z (slice: v1_incremental_intelligence)\\n- Key notes:\\n  - Initial analytical seed exists only for cold-start memory.\\n  - Historical similarity / benchmarking capabilities are not ready.\\n- Availability matrix highlights:\\n  - Intelligence briefing: available\\n  - RFQ analytical record: available\\n  - RFQ intake profile: available\\n  - Benchmarking: insufficient_historical_base\\n  - Similarity: insufficient_historical_base\\n  - Parser/report: not_ready\\n  - Workbook/profile/review: not_ready\\n- Briefing panel: executive_summary generated from manager-provided context; needs deeper parsing and enrichment. Missing items include deep file inventory, document extraction, structured compliance extraction. Status: partial.\\n- Intake panel: key gaps include deep file inventory, document extraction, structured compliance extraction. Quality: partial.\\n- Review panel: active_findings_count = 0; reason: No workbook review is available before workbook.uploaded. Status: not_ready.\\n- Source context: rfq.created event; source_event_id / source_event_type provided; snapshot segment: v1_incremental_intelligence.\\n\\nNotes\\n- This snapshot reflects partial readiness of analytical/benchmarking components. A human review is flagged as required, and several essential data extraction/structure components are still missing (deep file inventory, document extraction, structured compliance extraction).\\n\\nIf you\u2019d like, I can format this into a concise one-page briefing or pull out any specific sections you want to focus on (e.g., next actions for the engineering team or gaps to address before the BOQ/BOM prep).\",\"source_refs\":[{\"system\":\"rfq_intelligence_ms\",\"artifact\":\"rfq_intelligence_snapshot\",\"locator\":\"/intelligence/v1/rfqs/bcd812b9-ef01-42bc-96b1-1422814caf6e/snapshot\",\"parsed_at\":\"2026-04-15T18:30:18.690460\"}]}"
+      }
+    },
+    {
+      "name": "deliberate_failure_turn",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:8003/rfq-chatbot/v1/sessions/f6344fba-07e5-4152-9ac8-3b3710e312dd/turn",
+        "body": {
+          "content": "Show me RFQ analytics"
+        }
+      },
+      "response": {
+        "status": 422,
+        "body": "{\"detail\":\"This retrieval request is not supported in Phase 4 yet\"}"
+      }
+    }
+  ]
+}

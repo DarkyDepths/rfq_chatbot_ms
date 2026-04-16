@@ -1,0 +1,739 @@
+{
+  "info": {
+    "name": "rfq_chatbot_ms - Phase 5 Mode A Demo Beats v1",
+    "_postman_id": "rfq-chatbot-phase5-mode-a-demo-v1",
+    "description": "Step 8 Postman demo beats for Phase 5 Mode A.\n\nScope:\n- Adds six scripted demo beats matching the six pytest scenarios from Step 7.\n- Uses local stack endpoints.\n- Uses seeded manager RFQ IDs with real stage IDs for stage contrast.\n\nRun order:\n1) 0 - Bootstrap\n2) 1 - Scenario 1 (Role contrast)\n3) 2 - Scenario 2 (Stage contrast)\n4) 3 - Scenario 3 (Confidence marker)\n5) 4 - Scenario 4 (Capability-status absence)\n6) 5 - Scenario 5 (Trivial no-retrieval)\n7) 6 - Scenario 6 (Graceful degradation)\n\nManual note for Scenario 6:\n- Before running Scenario 6 turn request, stop rfq_manager_ms to force stage-resolution failure; restart it afterward.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('run_suffix')) {",
+          "  pm.collectionVariables.set('run_suffix', String(Date.now()));",
+          "}",
+          "if (!pm.collectionVariables.get('marker_text')) {",
+          "  pm.collectionVariables.set('marker_text', 'Confidence: pattern-based (validated against 1 sample)');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_origin",
+      "value": "http://localhost:8003"
+    },
+    {
+      "key": "chatbot_base",
+      "value": "{{base_origin}}/rfq-chatbot/v1"
+    },
+    {
+      "key": "health_url",
+      "value": "{{base_origin}}/health"
+    },
+    {
+      "key": "golden_rfq_id_stage_a",
+      "value": "31026589-e9a6-44b4-ad02-b4f5d5dd2b3a"
+    },
+    {
+      "key": "golden_rfq_id_stage_b",
+      "value": "56d239d4-32aa-4307-b12c-30c5a27db1fa"
+    },
+    {
+      "key": "question_profile",
+      "value": "Who owns this RFQ and when is the deadline?"
+    },
+    {
+      "key": "question_stage",
+      "value": "What stage are we in?"
+    },
+    {
+      "key": "question_snapshot",
+      "value": "Give me the current snapshot summary for this RFQ"
+    },
+    {
+      "key": "question_absence",
+      "value": "what's the briefing?"
+    },
+    {
+      "key": "question_greeting",
+      "value": "Hello copilot"
+    },
+    {
+      "key": "marker_text",
+      "value": "Confidence: pattern-based (validated against 1 sample)"
+    }
+  ],
+  "item": [
+    {
+      "name": "0 - Bootstrap",
+      "item": [
+        {
+          "name": "Health + initialize demo users",
+          "request": {
+            "method": "GET",
+            "url": "{{health_url}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health endpoint returns 200', () => pm.response.to.have.status(200));",
+                  "const suffix = pm.collectionVariables.get('run_suffix');",
+                  "pm.collectionVariables.set('user_lead', 'phase5-lead-' + suffix);",
+                  "pm.collectionVariables.set('user_exec', 'phase5-exec-' + suffix);",
+                  "pm.collectionVariables.set('user_stage', 'phase5-stage-' + suffix);",
+                  "pm.collectionVariables.set('user_conf', 'phase5-conf-' + suffix);",
+                  "pm.collectionVariables.set('user_absence', 'phase5-absence-' + suffix);",
+                  "pm.collectionVariables.set('user_trivial', 'phase5-trivial-' + suffix);",
+                  "pm.collectionVariables.set('user_degrade', 'phase5-degrade-' + suffix);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 - Scenario 1: Role contrast on same RFQ",
+      "item": [
+        {
+          "name": "Create lead RFQ session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_lead}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_a}}\",\n  \"role\": \"estimation_dept_lead\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Lead session created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('s1_lead_session_id', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create executive RFQ session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_exec}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_a}}\",\n  \"role\": \"executive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Executive session created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('s1_exec_session_id', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lead turn (baseline)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_profile}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s1_lead_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Lead turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Lead turn has source refs', () => pm.expect((body.source_refs || []).length).to.be.greaterThan(0));",
+                  "pm.collectionVariables.set('s1_lead_content', body.content || '');",
+                  "pm.collectionVariables.set('s1_lead_source_refs', JSON.stringify(body.source_refs || []));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Executive turn (compare)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_profile}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s1_exec_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Executive turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const leadContent = pm.collectionVariables.get('s1_lead_content') || '';",
+                  "const leadRefs = JSON.parse(pm.collectionVariables.get('s1_lead_source_refs') || '[]');",
+                  "pm.test('Both turns carry same source_refs', () => pm.expect(body.source_refs || []).to.eql(leadRefs));",
+                  "pm.test('Role contrast produces different text framing', () => pm.expect(body.content || '').to.not.eql(leadContent));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 - Scenario 2: Stage contrast on same question",
+      "item": [
+        {
+          "name": "Create stage-A RFQ session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_stage}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_a}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stage-A session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s2_stage_a_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create stage-B RFQ session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_stage}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_b}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stage-B session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s2_stage_b_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stage-A turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_stage}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s2_stage_a_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stage-A turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Stage-A turn has source refs', () => pm.expect((body.source_refs || []).length).to.be.greaterThan(0));",
+                  "pm.collectionVariables.set('s2_stage_a_content', body.content || '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stage-B turn (compare)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_stage}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s2_stage_b_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stage-B turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const aContent = pm.collectionVariables.get('s2_stage_a_content') || '';",
+                  "pm.test('Stage-B turn has source refs', () => pm.expect((body.source_refs || []).length).to.be.greaterThan(0));",
+                  "pm.test('Stage contrast yields different response framing', () => pm.expect(body.content || '').to.not.eql(aContent));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 - Scenario 3: Confidence marker presence and absence",
+      "item": [
+        {
+          "name": "Create RFQ session for confidence checks",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_conf}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_a}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Confidence session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s3_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pattern-based turn (snapshot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_snapshot}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s3_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pattern turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const marker = pm.collectionVariables.get('marker_text');",
+                  "pm.test('Pattern marker is present', () => pm.expect(body.content || '').to.include(marker));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deterministic turn (profile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_profile}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s3_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deterministic turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const marker = pm.collectionVariables.get('marker_text');",
+                  "pm.test('Pattern marker is absent on deterministic response', () => pm.expect(body.content || '').to.not.include(marker));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 - Scenario 4: Capability-status honest absence",
+      "item": [
+        {
+          "name": "Create global session for absence scenario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"global\",\n  \"user_id\": \"{{user_absence}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Absence session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s4_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ask unsupported capability",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_absence}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s4_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Absence turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Absence response follows template prefix', () => pm.expect(body.content || '').to.include('I don\'t have grounded facts for'));",
+                  "pm.test('Absence response includes a reason clause', () => pm.expect(body.content || '').to.include('because'));",
+                  "pm.test('No retrieval source refs for capability-status path', () => pm.expect((body.source_refs || []).length).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 - Scenario 5: Trivial no-retrieval turn",
+      "item": [
+        {
+          "name": "Create global session for trivial turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"global\",\n  \"user_id\": \"{{user_trivial}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Trivial session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s5_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Greeting turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_greeting}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s5_session_id}}/turn"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Greeting turn status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const marker = pm.collectionVariables.get('marker_text');",
+                  "pm.test('No retrieval source refs in trivial turn', () => pm.expect((body.source_refs || []).length).to.eql(0));",
+                  "pm.test('No confidence marker for trivial turn', () => pm.expect(body.content || '').to.not.include(marker));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 - Scenario 6: Graceful degradation (manual manager outage pre-step)",
+      "description": "Manual pre-step: stop rfq_manager_ms before running the turn below. This validates retrieval-independent greeting still returns 200 under stage-resolution failure. Restart manager after this folder completes.",
+      "item": [
+        {
+          "name": "Create RFQ session for degradation check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"rfq\",\n  \"user_id\": \"{{user_degrade}}\",\n  \"rfq_id\": \"{{golden_rfq_id_stage_a}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Degradation session created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('s6_session_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Greeting turn under manager outage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"{{question_greeting}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{chatbot_base}}/sessions/{{s6_session_id}}/turn",
+            "description": "With manager stopped, this request should still return 200 for retrieval-independent content."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Greeting under outage still returns 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const marker = pm.collectionVariables.get('marker_text');",
+                  "pm.test('No confidence marker in outage greeting', () => pm.expect(body.content || '').to.not.include(marker));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

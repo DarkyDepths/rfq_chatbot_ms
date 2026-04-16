@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from src.controllers.chat_controller import ChatController
 from src.controllers.context_builder import ContextBuilder
 from src.controllers.conversation_controller import ConversationController
+from src.controllers.role_controller import RoleController
+from src.controllers.stage_controller import StageController
 from src.controllers.tool_controller import ToolController
 from src.connectors.intelligence_connector import (
     IntelligenceSnapshotArtifact,
@@ -123,6 +125,8 @@ def _build_chat_controller(db_session):
             manager_connector=FakeManagerConnector(),
             intelligence_connector=FakeIntelligenceConnector(),
         ),
+        stage_controller=StageController(manager_connector=FakeManagerConnector()),
+        role_controller=RoleController(),
     )
     return session_ds, conversation_controller, fake_connector, chat_controller
 

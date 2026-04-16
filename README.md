@@ -1,6 +1,10 @@
 # rfq_chatbot_ms
 
-Phase 4 baseline for the RFQ Copilot microservice. The service now includes typed persistence contracts, the two-mode session model, the first conversational vertical slice, and a minimal real retrieval layer: read-only manager/intelligence connectors, typed tool envelopes, grounded RFQ retrieval during a turn, assistant-message provenance, and conversation readback.
+Phase 5 Mode A baseline for the RFQ Copilot microservice. The service now includes typed persistence contracts, the two-mode session model, the first conversational vertical slice, and real retrieval with Phase 5 behavior enrichment: proactive stage resolution, two-persona role framing, subtractive tool gating, closed-list capability absence handling, confidence-aware marker rendering, single-fetch intra-turn reuse, and structured observability fields.
+
+## What This Service Does
+
+This service keeps the external HTTP/API contract stable while making conversational behavior context-aware for RFQ-bound turns. It adapts responses using stage and role context, applies confidence-state rendering rules, and preserves provenance through `source_refs` without expanding response DTO shape.
 
 ## Architecture
 
@@ -34,7 +38,12 @@ utils/           -> Shared application errors and future support utilities
 - `GET /rfq-chatbot/v1/conversations/{conversation_id}`
 - Unit and integration tests for the current slice
 
-This service does not yet include Phase 5+ behavior: stage-aware behavior, role-aware framing, confidence-aware rendering, guardrails, intent classification, portfolio retrieval tools, or observability rollout.
+Phase 5 role/stage behavior is configured declaratively in:
+
+- `src/config/stage_profiles.py`
+- `src/config/role_profiles.py`
+
+This service does not yet include Phase 6+ behavior: grounding/knowledge-boundary guardrails, intent classification, portfolio retrieval tools, or broader Mode B maturation.
 
 The architecture brief and staged implementation roadmap live in:
 

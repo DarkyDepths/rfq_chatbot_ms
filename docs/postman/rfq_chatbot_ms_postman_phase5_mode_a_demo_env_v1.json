@@ -1,0 +1,64 @@
+{
+  "id": "rfq-chatbot-phase5-mode-a-demo-env-v1",
+  "name": "rfq_chatbot_ms_phase5_mode_a_demo_env_v1",
+  "values": [
+    {
+      "key": "base_origin",
+      "value": "http://localhost:8003",
+      "enabled": true
+    },
+    {
+      "key": "chatbot_base",
+      "value": "{{base_origin}}/rfq-chatbot/v1",
+      "enabled": true
+    },
+    {
+      "key": "health_url",
+      "value": "{{base_origin}}/health",
+      "enabled": true
+    },
+    {
+      "key": "golden_rfq_id_stage_a",
+      "value": "31026589-e9a6-44b4-ad02-b4f5d5dd2b3a",
+      "enabled": true
+    },
+    {
+      "key": "golden_rfq_id_stage_b",
+      "value": "56d239d4-32aa-4307-b12c-30c5a27db1fa",
+      "enabled": true
+    },
+    {
+      "key": "question_profile",
+      "value": "Who owns this RFQ and when is the deadline?",
+      "enabled": true
+    },
+    {
+      "key": "question_stage",
+      "value": "What stage are we in?",
+      "enabled": true
+    },
+    {
+      "key": "question_snapshot",
+      "value": "Give me the current snapshot summary for this RFQ",
+      "enabled": true
+    },
+    {
+      "key": "question_absence",
+      "value": "what's the briefing?",
+      "enabled": true
+    },
+    {
+      "key": "question_greeting",
+      "value": "Hello copilot",
+      "enabled": true
+    },
+    {
+      "key": "marker_text",
+      "value": "Confidence: pattern-based (validated against 1 sample)",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-04-16T00:00:00.000Z",
+  "_postman_exported_using": "GitHub Copilot"
+}

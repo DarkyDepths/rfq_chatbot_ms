@@ -165,13 +165,15 @@ def test_tool_controller_rejects_unsupported_retrieval_attempt():
     )
     session = type("Session", (), {"rfq_id": str(uuid.uuid4())})()
 
-    with pytest.raises(UnprocessableEntityError) as exc:
-        controller.maybe_execute_retrieval(
-            session,
-            "Show me the full briefing for this RFQ",
-        )
+    tool_calls = controller.maybe_execute_retrieval(
+        session,
+        "Show me the full briefing for this RFQ",
+    )
 
-    assert str(exc.value) == "This retrieval request is not supported in Phase 4 yet"
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_name == "get_capability_status"
+    assert tool_calls[0].result.confidence.value == "absent"
+    assert tool_calls[0].source_refs == []
 
 
 def test_tool_controller_rejects_ambiguous_retrieval_attempt():

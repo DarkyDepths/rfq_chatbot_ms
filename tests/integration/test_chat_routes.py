@@ -447,7 +447,9 @@ def test_ambiguous_retrieval_failure_does_not_persist_user_message(client, app, 
         _clear_phase4_dependencies(app)
 
 
-def test_unsupported_retrieval_failure_does_not_persist_user_message(client, app, db_session):
+def test_unsupported_retrieval_returns_capability_status_and_persists_messages(
+    client, app, db_session
+):
     fake_azure = FakeAzureOpenAIConnector()
     _override_phase4_dependencies(app, azure_connector=fake_azure)
     rfq_id = str(uuid.uuid4())
@@ -462,9 +464,12 @@ def test_unsupported_retrieval_failure_does_not_persist_user_message(client, app
             f"/rfq-chatbot/v1/sessions/{session_id}/turn",
             json={"content": "What is the grand total of this RFQ?"},
         )
+        payload = response.json()
 
-        assert response.status_code == 422
-        assert response.json()["detail"] == "This retrieval request is not supported in Phase 4 yet"
-        assert db_session.query(Message).count() == 0
+        assert response.status_code == 200
+        assert payload["role"] == "assistant"
+        assert payload["content"] == "assistant-response-1"
+        assert payload["source_refs"] == []
+        assert db_session.query(Message).count() == 2
     finally:
         _clear_phase4_dependencies(app)
