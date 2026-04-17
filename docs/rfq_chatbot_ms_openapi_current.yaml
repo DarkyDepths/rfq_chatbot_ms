@@ -1,0 +1,515 @@
+openapi: 3.0.3
+info:
+  title: rfq_chatbot_ms — Current API Contract
+  version: "1.0.0"
+  description: |
+    Authoritative machine-readable contract for the **currently implemented**
+    surface of `rfq_chatbot_ms`. This document reflects live repository behavior
+    (routes, request/response DTOs, error mapping, and persisted data model)
+    and is the source of truth from which the companion HTML view is derived.
+
+    Scope of the current baseline:
+      * Phase 1 — typed contracts & persistence foundations (sessions, conversations, messages).
+      * Phase 2 — session creation, retrieval, and one-way RFQ binding.
+      * Phase 3 — turn pipeline backed by Azure OpenAI chat completions.
+      * Phase 4 — read-only retrieval from `rfq_manager_ms` and
+        `rfq_intelligence_ms`, surfaced through provenance-bearing
+        `source_refs[]` on assistant messages.
+
+    Items intentionally deferred (and therefore **not** present in this contract):
+      * Briefing, workbook, analytics, and portfolio-search retrieval tools.
+      * Streaming chat, native function-calling, and multi-tool turns.
+      * AuthN/AuthZ middleware, IAM service integration.
+      * Correlation-ID middleware and a `/metrics` endpoint.
+      * Conversation listing/creation independent of a session.
+      * Unbinding or rebinding an RFQ-bound session.
+
+servers:
+  - url: http://localhost:8003
+    description: Local development
+  - url: http://rfq_chatbot_ms:8003
+    description: Docker network
+
+tags:
+  - name: Health
+    description: Operational liveness probes.
+  - name: Smoke
+    description: Bootstrap smoke endpoint proving the v1 routing stack is wired.
+  - name: Sessions
+    description: Chatbot session lifecycle (create, fetch, one-way RFQ bind).
+  - name: Chat
+    description: Conversational turn pipeline and conversation read-back.
+
+paths:
+
+  # ────────── Health ──────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Service liveness check
+      description: |
+        Returns a static liveness payload. In code this route is registered with
+        `include_in_schema=False`; it is documented here for operational
+        completeness because real deployments rely on it.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ────────── Smoke ──────────
+  /rfq-chatbot/v1/smoke:
+    get:
+      tags: [Smoke]
+      summary: Versioned smoke status
+      description: Minimal payload proving the `/rfq-chatbot/v1` router stack is wired.
+      operationId: getSmoke
+      responses:
+        "200":
+          description: Smoke payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmokeStatus"
+
+  # ────────── Sessions ──────────
+  /rfq-chatbot/v1/sessions:
+    post:
+      tags: [Sessions]
+      summary: Create a chatbot session
+      description: |
+        Creates either an RFQ-bound or portfolio (global) session.
+
+        Validation rules enforced by `ModeController.resolve_creation_mode`:
+          * If `mode == "rfq"` then `rfq_id` is **required** (else 422).
+          * If `mode == "global"` then `rfq_id` **must be null/omitted** (else 422).
+
+        When `role` is omitted, the server applies the configured
+        `AUTH_BYPASS_ROLE` default (currently `"estimation_dept_lead"`).
+
+        The persisted `mode` enum value is the **internal** value
+        (`rfq_bound` or `portfolio`), not the entry-mode value.
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCreateRequest"
+      responses:
+        "201":
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatbotSessionRead"
+        "422":
+          description: |
+            Validation failure. Examples:
+            `rfq_id is required when mode is 'rfq'`,
+            `rfq_id must be null when mode is 'global'`,
+            or a Pydantic shape error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rfq-chatbot/v1/sessions/{session_id}:
+    get:
+      tags: [Sessions]
+      summary: Fetch a session by id
+      operationId: getSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Session found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatbotSessionRead"
+        "404":
+          description: Session not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rfq-chatbot/v1/sessions/{session_id}/bind-rfq:
+    post:
+      tags: [Sessions]
+      summary: One-way bind a portfolio session to a single RFQ
+      description: |
+        Binds an existing portfolio (or pending-pivot) session to a single
+        downstream RFQ. This transition is **one-way and immutable**:
+
+          * Allowed transitions: `portfolio → rfq_bound`, `pending_pivot → rfq_bound`.
+          * If the session already has an `rfq_id`, returns 409 (no rebind).
+          * If the session is already `rfq_bound`, returns 409.
+          * There is no unbind endpoint.
+      operationId: bindSessionToRfq
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBindRequest"
+      responses:
+        "200":
+          description: Session successfully bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatbotSessionRead"
+        "404":
+          description: Session not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Session already bound, or transition not permitted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Request body validation error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ────────── Chat ──────────
+  /rfq-chatbot/v1/sessions/{session_id}/turn:
+    post:
+      tags: [Chat]
+      summary: Submit one user turn on a session
+      description: |
+        Runs one full turn through the Phase 4 chat pipeline:
+
+        1. Load the session (404 if missing).
+        2. Get-or-create the single conversation for that session.
+        3. **Plan retrieval** from the user content using keyword routing
+           (`ToolController._plan_tool_use`):
+             * Keywords for stage / progress / blockers → `get_rfq_stage`
+               (manager).
+             * Keywords for snapshot / currently known / missing info →
+               `get_rfq_snapshot` (intelligence).
+             * Keywords for deadline / owner / client / country / industry /
+               priority / workflow / rfq code / rfq status → `get_rfq_profile`
+               (manager).
+             * Keywords for briefing / workbook / analytics / portfolio /
+               grand total / final price → 422 (intentionally unsupported).
+             * Multiple matching tool families in a single turn → 422 (ambiguous).
+        4. If retrieval is planned, the session **must** be `rfq_bound` and
+           `session.rfq_id` **must** parse as a UUID; human-readable RFQ codes
+           (e.g. `IF-25144`) raise 422.
+        5. Persist the user message, build a `PromptEnvelope` (system prefix +
+           recent history + retrieved facts + latest turn), call Azure OpenAI
+           `chat.completions`, persist the assistant message, and return it.
+
+        Persisted `tool_calls` and `source_refs` are stored on the assistant
+        message; only `source_refs` are surfaced in the response DTO.
+      operationId: postTurn
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TurnRequest"
+      responses:
+        "200":
+          description: Assistant turn produced and persisted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TurnResponse"
+        "404":
+          description: Session not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: |
+            Unsupported retrieval, ambiguous retrieval plan, missing/invalid
+            RFQ binding for retrieval, or request body validation error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Azure OpenAI rate limit exceeded after retries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Upstream manager / intelligence / Azure OpenAI failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: Upstream timeout (manager, intelligence, or Azure OpenAI).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rfq-chatbot/v1/conversations/{conversation_id}:
+    get:
+      tags: [Chat]
+      summary: Read back a persisted conversation
+      description: |
+        Returns the conversation and its messages ordered by `turn_number`.
+        Each message exposes its persisted `source_refs[]` (provenance for
+        retrieval-backed assistant turns). Persisted `tool_calls` are kept
+        in storage but are intentionally not surfaced on this read DTO yet.
+      operationId: getConversation
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+      responses:
+        "200":
+          description: Conversation found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationReadResponse"
+        "404":
+          description: Conversation not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: rfq_chatbot_ms
+
+    SmokeStatus:
+      type: object
+      additionalProperties: false
+      required: [status, service, phase]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: rfq_chatbot_ms
+        phase:
+          type: string
+          example: phase-4
+
+    SessionEntryMode:
+      type: string
+      description: External business mode supplied at session creation.
+      enum: [rfq, global]
+
+    SessionMode:
+      type: string
+      description: |
+        Persisted internal mode. `rfq_bound` and `portfolio` are reached during
+        normal operation. `pending_pivot` is reserved for a future flow and
+        is not produced by any current endpoint.
+      enum: [rfq_bound, portfolio, pending_pivot]
+
+    SessionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, mode]
+      properties:
+        user_id:
+          type: string
+          minLength: 1
+        mode:
+          $ref: "#/components/schemas/SessionEntryMode"
+        rfq_id:
+          type: string
+          nullable: true
+          description: |
+            Required when `mode == "rfq"`. Must be null/omitted when
+            `mode == "global"`. Stored as a free-form string on the session
+            (not parsed at create time).
+        role:
+          type: string
+          nullable: true
+          description: Optional. Falls back to the configured `AUTH_BYPASS_ROLE`.
+
+    SessionBindRequest:
+      type: object
+      additionalProperties: false
+      required: [rfq_id]
+      properties:
+        rfq_id:
+          type: string
+          minLength: 1
+
+    ChatbotSessionRead:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, rfq_id, mode, role, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        rfq_id:
+          type: string
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/SessionMode"
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TurnRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: User turn text. Whitespace is stripped server-side.
+
+    SourceRef:
+      type: object
+      additionalProperties: false
+      required: [system, artifact, locator]
+      properties:
+        system:
+          type: string
+          description: Origin system identifier, e.g. `rfq_manager_ms`.
+        artifact:
+          type: string
+          description: Logical artifact name, e.g. `rfq`, `rfq_stages`, `rfq_intelligence_snapshot`.
+        locator:
+          type: string
+          description: Path or URI used to retrieve the artifact, e.g. `/rfq-manager/v1/rfqs/{id}`.
+        parsed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TurnResponse:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, turn_number, role, content, source_refs]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        turn_number:
+          type: integer
+          minimum: 1
+        role:
+          type: string
+          example: assistant
+        content:
+          type: string
+        source_refs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceRef"
+          description: |
+            Provenance pointers attached to this assistant message. Empty
+            when the turn was answered without retrieval.
+
+    ConversationMessageRead:
+      type: object
+      additionalProperties: false
+      required: [id, turn_number, role, content, source_refs, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        turn_number:
+          type: integer
+          minimum: 1
+        role:
+          type: string
+          description: Either `user` or `assistant` in the current implementation.
+        content:
+          type: string
+        source_refs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceRef"
+        timestamp:
+          type: string
+          format: date-time
+
+    ConversationReadResponse:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, session_id, messages]
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMessageRead"
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [detail]
+      description: |
+        Uniform JSON error shape produced by the application's exception
+        handlers. `RequestValidationError` is mapped to 422 with a
+        `Validation failed: <loc>: <msg> | …` detail string. Application
+        errors (`NotFoundError`, `ConflictError`, `UnprocessableEntityError`,
+        `RateLimitError`, `UpstreamServiceError`, `UpstreamTimeoutError`)
+        carry their class default message unless overridden at raise-site.
+      properties:
+        detail:
+          type: string
