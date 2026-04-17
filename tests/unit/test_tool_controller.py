@@ -158,20 +158,22 @@ def test_tool_controller_rejects_missing_rfq_binding_for_retrieval():
     assert "requires an RFQ-bound session" in str(exc.value)
 
 
-def test_tool_controller_rejects_unsupported_retrieval_attempt():
+def test_tool_controller_handles_unsupported_capability_via_status_response():
     controller = ToolController(
         manager_connector=FakeManagerConnector(),
         intelligence_connector=FakeIntelligenceConnector(),
     )
     session = type("Session", (), {"rfq_id": str(uuid.uuid4())})()
 
-    with pytest.raises(UnprocessableEntityError) as exc:
-        controller.maybe_execute_retrieval(
-            session,
-            "Show me the full briefing for this RFQ",
-        )
+    tool_calls = controller.maybe_execute_retrieval(
+        session,
+        "Show me the full briefing for this RFQ",
+    )
 
-    assert str(exc.value) == "This retrieval request is not supported in Phase 4 yet"
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_name == "get_capability_status"
+    assert tool_calls[0].result.confidence.value == "absent"
+    assert tool_calls[0].source_refs == []
 
 
 def test_tool_controller_rejects_ambiguous_retrieval_attempt():
@@ -189,5 +191,5 @@ def test_tool_controller_rejects_ambiguous_retrieval_attempt():
 
     assert (
         str(exc.value)
-        == "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
+        == "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
     )

@@ -11,6 +11,8 @@ from src.controllers.chat_controller import ChatController
 from src.controllers.context_builder import ContextBuilder
 from src.controllers.conversation_controller import ConversationController
 from src.controllers.mode_controller import ModeController
+from src.controllers.role_controller import RoleController
+from src.controllers.stage_controller import StageController
 from src.controllers.tool_controller import ToolController
 from src.database import get_db
 from src.datasources.conversation_datasource import ConversationDatasource
@@ -23,7 +25,7 @@ def get_smoke_payload() -> dict[str, str]:
     return {
         "status": "ok",
         "service": "rfq_chatbot_ms",
-        "phase": "phase-4",
+        "phase": "phase-5",
     }
 
 
@@ -101,14 +103,30 @@ def get_tool_controller(
     )
 
 
+def get_stage_controller(
+    manager_connector: ManagerConnector = Depends(get_manager_connector),
+) -> StageController:
+    """Build the Phase 5 stage controller."""
+
+    return StageController(manager_connector=manager_connector)
+
+
+def get_role_controller() -> RoleController:
+    """Build the Phase 5 role controller."""
+
+    return RoleController()
+
+
 def get_chat_controller(
     session_datasource: SessionDatasource = Depends(get_session_datasource),
     conversation_controller: ConversationController = Depends(get_conversation_controller),
     context_builder: ContextBuilder = Depends(get_context_builder),
     azure_openai_connector: AzureOpenAIConnector = Depends(get_azure_openai_connector),
     tool_controller: ToolController = Depends(get_tool_controller),
+    stage_controller: StageController = Depends(get_stage_controller),
+    role_controller: RoleController = Depends(get_role_controller),
 ) -> ChatController:
-    """Build the Phase 4 chat controller for the current request."""
+    """Build the Phase 5 chat controller for the current request."""
 
     return ChatController(
         session_datasource=session_datasource,
@@ -116,4 +134,6 @@ def get_chat_controller(
         context_builder=context_builder,
         azure_openai_connector=azure_openai_connector,
         tool_controller=tool_controller,
+        stage_controller=stage_controller,
+        role_controller=role_controller,
     )
