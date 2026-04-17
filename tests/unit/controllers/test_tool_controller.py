@@ -290,7 +290,7 @@ def test_multiple_tool_families_surviving_gates_raises_ambiguous_422():
 
     assert (
         str(exc.value)
-        == "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
+        == "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
     )
 
 

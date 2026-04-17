@@ -1,7 +1,13 @@
 Phase 5 Mode A — Implementation Pack v1.0
 =========================================
 
-**Status:** Frozen — no conceptual decisions remain open**Scope:** rfq\_chatbot\_ms — Mode A (RFQ Copilot) behavioral enrichment**Posture:** Behavior-first, contract-stable, declarative configuration, subtractive gating**Pairing:** This Pack defines _what_. The companion Blueprint defines _how_ (file-by-file sequence).
+**Status:** Frozen — no conceptual decisions remain open
+
+**Scope:** rfq\_chatbot\_ms — Mode A (RFQ Copilot) behavioral enrichment
+
+**Posture:** Behavior-first, contract-stable, declarative configuration, subtractive gating
+
+**Pairing:** This Pack defines _what_. The companion Blueprint defines _how_ (file-by-file sequence).
 
 0\. Executive summary
 ---------------------

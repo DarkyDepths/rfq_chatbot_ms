@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from src.connectors.azure_openai_connector import AzureOpenAIConnector
-from src.controllers.context_builder import ContextBuilder
+from src.controllers.context_builder import CONFIDENCE_PATTERN_MARKER, ContextBuilder
 from src.controllers.conversation_controller import ConversationController
 from src.controllers.role_controller import RoleController
 from src.controllers.stage_controller import StageController
@@ -109,10 +109,7 @@ class ChatController:
         )
         azure_messages = self._build_azure_messages(prompt_envelope)
         completion = self.azure_openai_connector.create_chat_completion(azure_messages)
-        confidence_marker_emitted = (
-            "Confidence: pattern-based (validated against 1 sample)"
-            in completion.assistant_text
-        )
+        confidence_marker_emitted = CONFIDENCE_PATTERN_MARKER in completion.assistant_text
         logger.info(
             "phase5.confidence_marker_emitted=%s",
             confidence_marker_emitted,

@@ -1,4 +1,4 @@
-"""Minimal explicit tool selection and execution for Phase 4 retrieval."""
+"""Minimal explicit tool selection and execution for Phase 5 retrieval."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class RetrievalPlan(BaseModel):
-    """A small typed record describing one planned Phase 4 retrieval."""
+    """A small typed record describing one planned Phase 5 retrieval."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -45,7 +45,7 @@ class CapabilityStatusHit:
 
 
 class ToolController:
-    """Owns explicit Phase 4 tool selection and read-only execution."""
+    """Owns explicit Phase 5 tool selection and read-only execution."""
 
     stage_keywords = (
         "stage",
@@ -206,7 +206,7 @@ class ToolController:
         tool_names = {plan.tool_name for plan in role_filtered_plans}
         if len(tool_names) > 1:
             raise UnprocessableEntityError(
-                "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
+                "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
             )
         if role_filtered_plans:
             return role_filtered_plans[0]
@@ -256,14 +256,14 @@ class ToolController:
     def _require_rfq_uuid(self, chatbot_session: ChatbotSession) -> uuid.UUID:
         if not chatbot_session.rfq_id:
             raise UnprocessableEntityError(
-                "Phase 4 retrieval requires an RFQ-bound session with a downstream RFQ id"
+                "Phase 5 retrieval requires an RFQ-bound session with a downstream RFQ id"
             )
 
         try:
             return uuid.UUID(str(chatbot_session.rfq_id))
         except ValueError as exc:
             raise UnprocessableEntityError(
-                "Phase 4 retrieval requires session.rfq_id to be a downstream UUID. "
+                "Phase 5 retrieval requires session.rfq_id to be a downstream UUID. "
                 "Human-readable RFQ codes like 'IF-25144' are not supported here yet."
             ) from exc
 

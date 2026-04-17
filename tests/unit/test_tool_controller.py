@@ -158,7 +158,7 @@ def test_tool_controller_rejects_missing_rfq_binding_for_retrieval():
     assert "requires an RFQ-bound session" in str(exc.value)
 
 
-def test_tool_controller_rejects_unsupported_retrieval_attempt():
+def test_tool_controller_handles_unsupported_capability_via_status_response():
     controller = ToolController(
         manager_connector=FakeManagerConnector(),
         intelligence_connector=FakeIntelligenceConnector(),
@@ -191,5 +191,5 @@ def test_tool_controller_rejects_ambiguous_retrieval_attempt():
 
     assert (
         str(exc.value)
-        == "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
+        == "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
     )

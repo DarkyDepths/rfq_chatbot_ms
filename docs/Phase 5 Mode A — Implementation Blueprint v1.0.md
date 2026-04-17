@@ -1,7 +1,13 @@
 Phase 5 Mode A — Implementation Blueprint v1.0
 ==============================================
 
-**Pair:** Execution plan for rfq\_chatbot\_ms Phase 5 Mode A — Implementation Pack v1.0**Posture:** File-by-file sequence. Each step is independently reviewable and independently testable.**Scope discipline:** This Blueprint adds _no_ decisions beyond the Pack. Where the Pack is silent, the Blueprint defers (not invents).**Acceptance:** Blueprint is complete when all ten criteria in Pack §12 hold.
+**Pair:** Execution plan for rfq\_chatbot\_ms Phase 5 Mode A — Implementation Pack v1.0
+
+**Posture:** File-by-file sequence. Each step is independently reviewable and independently testable.
+
+**Scope discipline:** This Blueprint adds _no_ decisions beyond the Pack. Where the Pack is silent, the Blueprint defers (not invents).
+
+**Acceptance:** Blueprint is complete when all ten criteria in Pack §12 hold.
 
 0\. How to read this Blueprint
 ------------------------------

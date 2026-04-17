@@ -373,7 +373,7 @@ def test_retrieval_with_human_readable_rfq_code_fails_clearly(client, app):
 
         assert response.status_code == 422
         assert response.json()["detail"] == (
-            "Phase 4 retrieval requires session.rfq_id to be a downstream UUID. "
+            "Phase 5 retrieval requires session.rfq_id to be a downstream UUID. "
             "Human-readable RFQ codes like 'IF-25144' are not supported here yet."
         )
     finally:
@@ -419,7 +419,7 @@ def test_ambiguous_retrieval_request_fails_clearly(client, app):
 
         assert response.status_code == 422
         assert response.json()["detail"] == (
-            "This retrieval request is ambiguous in Phase 4; ask for one RFQ fact at a time"
+            "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
         )
     finally:
         _clear_phase4_dependencies(app)
