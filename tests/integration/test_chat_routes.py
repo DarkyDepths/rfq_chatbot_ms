@@ -473,3 +473,28 @@ def test_unsupported_retrieval_returns_capability_status_and_persists_messages(
         assert db_session.query(Message).count() == 2
     finally:
         _clear_phase4_dependencies(app)
+
+
+def test_global_mode_capability_status_question_returns_valid_turn_response(client, app):
+    fake_azure = FakeAzureOpenAIConnector()
+    _override_phase4_dependencies(app, azure_connector=fake_azure)
+    try:
+        session_response = client.post(
+            "/rfq-chatbot/v1/sessions",
+            json={"mode": "global", "user_id": "chat-user"},
+        )
+        session_id = session_response.json()["id"]
+
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "what is the briefing?"},
+        )
+        payload = response.json()
+
+        assert response.status_code == 200
+        assert response.status_code != 422
+        assert payload["role"] == "assistant"
+        assert payload["source_refs"] == []
+        assert payload["content"]
+    finally:
+        _clear_phase4_dependencies(app)
