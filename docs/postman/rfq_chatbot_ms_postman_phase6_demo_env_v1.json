@@ -1,0 +1,94 @@
+{
+  "id": "rfq-chatbot-phase6-demo-env-v1",
+  "name": "rfq_chatbot_ms_phase6_demo_env_v1",
+  "values": [
+    {
+      "key": "base_origin",
+      "value": "http://localhost:8003",
+      "enabled": true
+    },
+    {
+      "key": "chatbot_base",
+      "value": "{{base_origin}}/rfq-chatbot/v1",
+      "enabled": true
+    },
+    {
+      "key": "health_url",
+      "value": "{{base_origin}}/health",
+      "enabled": true
+    },
+    {
+      "key": "golden_rfq_id_primary",
+      "value": "31026589-e9a6-44b4-ad02-b4f5d5dd2b3a",
+      "enabled": true
+    },
+    {
+      "key": "golden_rfq_id_secondary",
+      "value": "56d239d4-32aa-4307-b12c-30c5a27db1fa",
+      "enabled": true
+    },
+    {
+      "key": "question_deadline",
+      "value": "what's the deadline?",
+      "enabled": true
+    },
+    {
+      "key": "question_owner",
+      "value": "who owns this RFQ?",
+      "enabled": true
+    },
+    {
+      "key": "question_pwht",
+      "value": "what is PWHT?",
+      "enabled": true
+    },
+    {
+      "key": "question_rt",
+      "value": "how does RT work?",
+      "enabled": true
+    },
+    {
+      "key": "question_unsupported",
+      "value": "what's the briefing?",
+      "enabled": true
+    },
+    {
+      "key": "question_greeting",
+      "value": "hello copilot",
+      "enabled": true
+    },
+    {
+      "key": "question_rfq_ambiguous",
+      "value": "what's the status of this RFQ?",
+      "enabled": true
+    },
+    {
+      "key": "question_rfq_resolution",
+      "value": "IF-25144",
+      "enabled": true
+    },
+    {
+      "key": "question_rfq_abandon",
+      "value": "never mind, what is PWHT?",
+      "enabled": true
+    },
+    {
+      "key": "question_mismatch",
+      "value": "tell me about the fabrication schedule for this RFQ",
+      "enabled": true
+    },
+    {
+      "key": "marker_text",
+      "value": "Confidence: pattern-based (validated against 1 sample)",
+      "enabled": true
+    },
+    {
+      "key": "phase5_collection_name",
+      "value": "rfq_chatbot_ms_postman_phase5_mode_a_demo_v1.json",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-04-18T00:00:00.000Z",
+  "_postman_exported_using": "GitHub Copilot"
+}

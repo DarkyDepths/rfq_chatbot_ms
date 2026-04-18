@@ -30,7 +30,9 @@ class ContextBuilder:
         latest_user_turn: str | None = None,
         stage_resolution=None,
         role_resolution=None,
+        disambiguation_context: dict | None = None,
         any_pattern_based_tool_fired: bool = False,
+        grounding_gap: bool = False,
         capability_status_hit=None,
     ) -> PromptEnvelope:
         """Return the frozen PromptEnvelope contract for the current turn."""
@@ -38,7 +40,9 @@ class ContextBuilder:
         stable_prefix = self._build_stable_prefix(
             stage_resolution=stage_resolution,
             role_resolution=role_resolution,
+            disambiguation_context=disambiguation_context,
             any_pattern_based_tool_fired=any_pattern_based_tool_fired,
+            grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
         )
 
@@ -46,6 +50,7 @@ class ContextBuilder:
             recent_messages=recent_messages,
             retrieval_context_blocks=retrieval_context_blocks,
             latest_user_turn=latest_user_turn,
+            disambiguation_context=disambiguation_context,
             capability_status_hit=capability_status_hit,
         )
 
@@ -60,12 +65,16 @@ class ContextBuilder:
         *,
         stage_resolution,
         role_resolution,
+        disambiguation_context: dict | None,
         any_pattern_based_tool_fired: bool,
+        grounding_gap: bool,
         capability_status_hit,
     ) -> str:
         role_profile = ROLE_PROFILES[FALLBACK_ROLE]
         if role_resolution is not None and getattr(role_resolution, "profile", None):
             role_profile = role_resolution.profile
+        if disambiguation_context is not None and disambiguation_context.get("role_profile"):
+            role_profile = disambiguation_context["role_profile"]
 
         stage_fragment = "Use neutral stage framing when exact stage context is unavailable."
         stage_name = None
@@ -79,12 +88,32 @@ class ContextBuilder:
 
         confidence_directives = self._build_confidence_directives(
             any_pattern_based_tool_fired=any_pattern_based_tool_fired,
+            grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
         )
 
         stage_lines = [f"Stage framing: {stage_fragment}"]
         if stage_name:
             stage_lines.append(f"Current stage label: {stage_name}")
+
+        disambiguation_lines: list[str] = []
+        if disambiguation_context is not None:
+            disambiguation_lines = [
+                "Disambiguation behavior: RFQ resolution mode.",
+                (
+                    "The user asked a question that references an RFQ, but no RFQ is "
+                    "bound to this session."
+                ),
+                (
+                    "Generate a clarification response asking the user to identify which "
+                    "RFQ they mean."
+                ),
+                (
+                    "You may ask for an RFQ code (e.g., IF-25144, RFQ-01) or suggest "
+                    "the user bind their session."
+                ),
+                "Do not answer the user's question directly. Ask for clarification only.",
+            ]
 
         prefix_lines = [
             self.system_prompt,
@@ -94,6 +123,8 @@ class ContextBuilder:
             "",
             *stage_lines,
             "",
+            *disambiguation_lines,
+            *( [""] if disambiguation_lines else [] ),
             *confidence_directives,
         ]
         return "\n".join(prefix_lines)
@@ -102,6 +133,7 @@ class ContextBuilder:
     def _build_confidence_directives(
         *,
         any_pattern_based_tool_fired: bool,
+        grounding_gap: bool,
         capability_status_hit,
     ) -> list[str]:
         if capability_status_hit is not None:
@@ -115,6 +147,19 @@ class ContextBuilder:
                 ),
                 "Optionally add one sentence redirecting to capabilities you can answer now.",
                 "Do not invent any capability status beyond the provided condition.",
+                "Do not append any confidence marker line for this response mode.",
+            ]
+
+        if grounding_gap:
+            return [
+                "Grounding behavior: grounding gap mode.",
+                (
+                    "The user asked an RFQ-specific question but no grounded tool evidence "
+                    "is available."
+                ),
+                "Do not generate any RFQ-specific factual claims. Instead, respond honestly:",
+                "state that you cannot retrieve the requested information right now,",
+                "and suggest what you can help with or ask the user to rephrase.",
                 "Do not append any confidence marker line for this response mode.",
             ]
 
@@ -138,14 +183,19 @@ class ContextBuilder:
         recent_messages,
         retrieval_context_blocks,
         latest_user_turn: str | None,
+        disambiguation_context: dict | None,
         capability_status_hit,
     ) -> str:
         transcript_lines = ["Conversation history:"]
         for message in recent_messages:
             transcript_lines.append(f"{message.role}: {message.content}")
 
-        # Capability-status mode is a no-retrieval path.
-        if retrieval_context_blocks and capability_status_hit is None:
+        # Capability-status and disambiguation modes are no-retrieval paths.
+        if (
+            retrieval_context_blocks
+            and capability_status_hit is None
+            and disambiguation_context is None
+        ):
             transcript_lines.append("")
             transcript_lines.append("Retrieved facts:")
             transcript_lines.extend(retrieval_context_blocks)
