@@ -10,6 +10,8 @@ from src.connectors.manager_connector import ManagerConnector
 from src.controllers.chat_controller import ChatController
 from src.controllers.context_builder import ContextBuilder
 from src.controllers.conversation_controller import ConversationController
+from src.controllers.disambiguation_controller import DisambiguationController
+from src.controllers.intent_controller import IntentController
 from src.controllers.mode_controller import ModeController
 from src.controllers.role_controller import RoleController
 from src.controllers.stage_controller import StageController
@@ -117,6 +119,18 @@ def get_role_controller() -> RoleController:
     return RoleController()
 
 
+def get_intent_controller() -> IntentController:
+    """Build the Phase 6 deterministic intent controller."""
+
+    return IntentController()
+
+
+def get_disambiguation_controller() -> DisambiguationController:
+    """Build the Phase 6 disambiguation controller."""
+
+    return DisambiguationController()
+
+
 def get_chat_controller(
     session_datasource: SessionDatasource = Depends(get_session_datasource),
     conversation_controller: ConversationController = Depends(get_conversation_controller),
@@ -125,8 +139,10 @@ def get_chat_controller(
     tool_controller: ToolController = Depends(get_tool_controller),
     stage_controller: StageController = Depends(get_stage_controller),
     role_controller: RoleController = Depends(get_role_controller),
+    intent_controller: IntentController = Depends(get_intent_controller),
+    disambiguation_controller: DisambiguationController = Depends(get_disambiguation_controller),
 ) -> ChatController:
-    """Build the Phase 5 chat controller for the current request."""
+    """Build the Phase 6 chat controller for the current request."""
 
     return ChatController(
         session_datasource=session_datasource,
@@ -136,4 +152,6 @@ def get_chat_controller(
         tool_controller=tool_controller,
         stage_controller=stage_controller,
         role_controller=role_controller,
+        intent_controller=intent_controller,
+        disambiguation_controller=disambiguation_controller,
     )

@@ -1,10 +1,10 @@
 # rfq_chatbot_ms
 
-Phase 5 Mode A baseline for the RFQ Copilot microservice. The service now includes typed persistence contracts, the two-mode session model, the first conversational vertical slice, and real retrieval with Phase 5 behavior enrichment: proactive stage resolution, two-persona role framing, subtractive tool gating, closed-list capability absence handling, confidence-aware marker rendering, single-fetch intra-turn reuse, and structured observability fields.
+Phase 6 baseline for the RFQ Copilot microservice. The service keeps the stable typed persistence contracts and two-mode session model while adding intent-aware routing, grounding-enforced RFQ-specific behavior, disambiguation-capable portfolio handling, soft output guardrails, and structured observability fields.
 
 ## What This Service Does
 
-This service keeps the external HTTP/API contract stable while making conversational behavior context-aware for RFQ-bound turns. It adapts responses using stage and role context, applies confidence-state rendering rules, and preserves provenance through `source_refs` without expanding response DTO shape.
+This service keeps the external HTTP/API contract stable while making conversational behavior context-aware across both RFQ-bound and portfolio turns. It classifies turn intent deterministically, routes turns by intent boundary, adapts responses using stage and role context, applies grounding and capability-status rules, and preserves provenance through `source_refs` without expanding response DTO shape.
 
 ## Architecture
 
@@ -38,12 +38,14 @@ utils/           -> Shared application errors and future support utilities
 - `GET /rfq-chatbot/v1/conversations/{conversation_id}`
 - Unit and integration tests for the current slice
 
-Phase 5 role/stage behavior is configured declaratively in:
+Phase 5/6 behavior is configured declaratively in:
 
 - `src/config/stage_profiles.py`
 - `src/config/role_profiles.py`
+- `src/config/intent_patterns.py`
+- `src/config/disambiguation_config.py`
 
-This service does not yet include Phase 6+ behavior: grounding/knowledge-boundary guardrails, intent classification, portfolio retrieval tools, or broader Mode B maturation.
+This service does not yet include Phase 7+ behavior: LLM-based intent classification, semantic hallucination detection, hard output-guardrail enforcement, portfolio analytics/retrieval tooling, or contract redesign.
 
 The architecture brief and staged implementation roadmap live in:
 

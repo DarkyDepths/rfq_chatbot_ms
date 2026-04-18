@@ -150,3 +150,110 @@ def test_variable_suffix_keeps_phase4_composition_order_with_new_signals_absent(
     assert lines[6] == "Value: {\"owner\": \"Sarah\"}"
     assert lines[7] == "user: What is the deadline?"
     assert lines[8] == "assistant:"
+
+
+def test_grounding_gap_injects_absence_directive():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="Need deadline")],
+        latest_user_turn="What's the deadline?",
+        grounding_gap=True,
+    )
+
+    assert "Grounding behavior: grounding gap mode." in prompt.stable_prefix
+    assert "state that you cannot retrieve the requested information right now" in prompt.stable_prefix
+
+
+def test_grounding_gap_suppresses_pattern_based_marker_directive():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="Need deadline")],
+        latest_user_turn="What's the deadline?",
+        grounding_gap=True,
+        any_pattern_based_tool_fired=True,
+    )
+
+    assert CONFIDENCE_PATTERN_MARKER not in prompt.stable_prefix
+
+
+def test_pattern_based_marker_behavior_unchanged_when_grounding_gap_is_false():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="Need snapshot")],
+        latest_user_turn="Give me a snapshot",
+        grounding_gap=False,
+        any_pattern_based_tool_fired=True,
+    )
+
+    assert "Confidence behavior: pattern-based evidence mode." in prompt.stable_prefix
+    assert CONFIDENCE_PATTERN_MARKER in prompt.stable_prefix
+
+
+def test_capability_status_precedence_overrides_grounding_gap_mode():
+    builder = ContextBuilder()
+    hit = CapabilityStatusHit(
+        matched_keyword="briefing",
+        capability_name="RFQ intelligence briefing retrieval",
+        named_future_condition="available after briefing rollout is enabled in a later phase",
+    )
+
+    prompt = builder.build(
+        [SimpleNamespace(role="assistant", content="Earlier answer")],
+        latest_user_turn="Show briefing",
+        grounding_gap=True,
+        capability_status_hit=hit,
+    )
+
+    assert "Confidence behavior: capability absence response mode." in prompt.stable_prefix
+    assert "Grounding behavior: grounding gap mode." not in prompt.stable_prefix
+
+
+def test_disambiguation_context_injects_rfq_resolution_directive():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="What's the status?")],
+        latest_user_turn="What's the status of this RFQ?",
+        disambiguation_context={
+            "disambiguation_mode": True,
+            "user_question": "What's the status of this RFQ?",
+            "role_profile": ROLE_PROFILES["executive"],
+        },
+    )
+
+    assert "Disambiguation behavior: RFQ resolution mode." in prompt.stable_prefix
+    assert "Do not answer the user's question directly. Ask for clarification only." in prompt.stable_prefix
+    assert ROLE_PROFILES["executive"]["tone_directive"] in prompt.stable_prefix
+
+
+def test_disambiguation_context_suppresses_retrieval_blocks_in_variable_suffix():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="assistant", content="Earlier answer")],
+        retrieval_context_blocks=["Tool: get_rfq_profile", "Value: {\"owner\": \"Sarah\"}"],
+        latest_user_turn="What's the status of this RFQ?",
+        disambiguation_context={
+            "disambiguation_mode": True,
+            "user_question": "What's the status of this RFQ?",
+            "role_profile": ROLE_PROFILES["estimation_dept_lead"],
+        },
+    )
+
+    assert "Retrieved facts:" not in prompt.variable_suffix
+
+
+def test_without_disambiguation_context_behavior_is_unchanged():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="assistant", content="Earlier answer")],
+        retrieval_context_blocks=["Tool: get_rfq_profile"],
+        latest_user_turn="What is the deadline?",
+    )
+
+    assert "Disambiguation behavior: RFQ resolution mode." not in prompt.stable_prefix
+    assert "Retrieved facts:" in prompt.variable_suffix

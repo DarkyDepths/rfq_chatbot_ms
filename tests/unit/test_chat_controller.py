@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from src.controllers.chat_controller import ChatController
 from src.controllers.context_builder import ContextBuilder
 from src.controllers.conversation_controller import ConversationController
+from src.controllers.disambiguation_controller import DisambiguationController
+from src.controllers.intent_controller import IntentController
 from src.controllers.role_controller import RoleController
 from src.controllers.stage_controller import StageController
 from src.controllers.tool_controller import ToolController
@@ -127,6 +129,8 @@ def _build_chat_controller(db_session):
         ),
         stage_controller=StageController(manager_connector=FakeManagerConnector()),
         role_controller=RoleController(),
+        intent_controller=IntentController(),
+        disambiguation_controller=DisambiguationController(),
     )
     return session_ds, conversation_controller, fake_connector, chat_controller
 

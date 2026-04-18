@@ -22,11 +22,7 @@ from src.connectors.intelligence_connector import (
     SnapshotRfqSummary,
     SnapshotWorkbookPanel,
 )
-from src.connectors.manager_connector import (
-    ManagerConnector,
-    ManagerRfqDetail,
-    ManagerRfqStageListResponse,
-)
+from src.connectors.manager_connector import ManagerConnector, ManagerRfqDetail
 from src.utils.errors import UpstreamServiceError
 
 
@@ -34,27 +30,17 @@ KNOWN_STAGE_ID = next(iter(STAGE_PROFILES.keys()))
 
 
 @dataclass
-class FakeAzureOpenAIConnector:
+class EchoAzureConnector:
     calls: list = field(default_factory=list)
 
     def create_chat_completion(self, messages, tools=None):
-        self.calls.append({"messages": messages, "tools": tools})
         stable_prefix = messages[0]["content"]
-
-        if "template exactly: I don't have grounded facts for" in stable_prefix:
-            return ChatCompletionResult(
-                assistant_text=(
-                    "I don't have grounded facts for RFQ intelligence briefing retrieval "
-                    "yet because available after briefing rollout is enabled in a later phase."
-                )
-            )
-
+        self.calls.append({"messages": messages, "tools": tools})
         if "Grounding behavior: grounding gap mode." in stable_prefix:
             return ChatCompletionResult(
                 assistant_text="I cannot retrieve the requested information right now."
             )
-
-        return ChatCompletionResult(assistant_text=f"assistant-response-{len(self.calls)}")
+        return ChatCompletionResult(assistant_text="assistant-response")
 
 
 class CountingManagerConnector(ManagerConnector):
@@ -67,7 +53,6 @@ class CountingManagerConnector(ManagerConnector):
         self.get_rfq_calls += 1
         if self.fail_get_rfq:
             raise UpstreamServiceError("Manager service request failed")
-
         return ManagerRfqDetail.model_validate(
             {
                 "id": str(rfq_id),
@@ -77,7 +62,7 @@ class CountingManagerConnector(ManagerConnector):
                 "status": "open",
                 "progress": 35,
                 "deadline": "2026-05-01",
-                "current_stage_name": "Review",
+                "current_stage_name": "Go / No-Go",
                 "workflow_name": "Industrial RFQ",
                 "industry": "Oil & Gas",
                 "country": "SA",
@@ -94,20 +79,7 @@ class CountingManagerConnector(ManagerConnector):
 
     def get_rfq_stages(self, rfq_id):
         self.get_rfq_stages_calls += 1
-        return ManagerRfqStageListResponse.model_validate(
-            {
-                "data": [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "name": "Review",
-                        "order": 2,
-                        "assigned_team": "Estimating",
-                        "status": "open",
-                        "progress": 35,
-                    }
-                ]
-            }
-        )
+        return {"data": []}
 
 
 class CountingIntelligenceConnector:
@@ -135,10 +107,7 @@ class CountingIntelligenceConnector:
                 ),
                 availability_matrix={"intelligence_briefing": "available"},
                 intake_panel_summary=SnapshotIntakePanelSummary(status="available"),
-                briefing_panel_summary=SnapshotBriefingPanelSummary(
-                    status="available",
-                    executive_summary="Known summary",
-                ),
+                briefing_panel_summary=SnapshotBriefingPanelSummary(status="available"),
                 workbook_panel=SnapshotWorkbookPanel(status="not_ready"),
                 review_panel=SnapshotReviewPanel(status="not_ready"),
                 analytical_status_summary=SnapshotAnalyticalStatusSummary(
@@ -154,7 +123,7 @@ class CountingIntelligenceConnector:
         )
 
 
-def _override_step6_dependencies(
+def _override_dependencies(
     app,
     *,
     azure_connector,
@@ -166,14 +135,14 @@ def _override_step6_dependencies(
     app.dependency_overrides[get_intelligence_connector] = lambda: intelligence_connector
 
 
-def _clear_step6_dependencies(app):
+def _clear_dependencies(app):
     app.dependency_overrides.pop(get_azure_openai_connector, None)
     app.dependency_overrides.pop(get_manager_connector, None)
     app.dependency_overrides.pop(get_intelligence_connector, None)
 
 
 def _create_session(client, *, mode: str, rfq_id: str | None = None, role: str | None = None):
-    payload = {"mode": mode, "user_id": "chat-user"}
+    payload = {"mode": mode, "user_id": "intent-routing-user"}
     if rfq_id is not None:
         payload["rfq_id"] = rfq_id
     if role is not None:
@@ -188,43 +157,11 @@ def _log_values(caplog, field_name: str):
     return [record.__dict__[field_name] for record in caplog.records if field_name in record.__dict__]
 
 
-def test_pipeline_portfolio_greeting_skips_retrieval_and_returns_200(client, app, caplog):
-    fake_azure = FakeAzureOpenAIConnector()
+def test_route_rfq_specific_uses_tools_pipeline(client, app, caplog):
+    fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
-        app,
-        azure_connector=fake_azure,
-        manager_connector=manager,
-        intelligence_connector=intelligence,
-    )
-
-    try:
-        with caplog.at_level(logging.INFO):
-            session_id = _create_session(client, mode="global")
-            response = client.post(
-                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-                json={"content": "Hello copilot"},
-            )
-
-        payload = response.json()
-        assert response.status_code == 200
-        assert payload["source_refs"] == []
-        assert manager.get_rfq_calls == 0
-        assert manager.get_rfq_stages_calls == 0
-        assert intelligence.get_snapshot_calls == 0
-        assert _log_values(caplog, "phase5.confidence_marker_emitted")[-1] is False
-    finally:
-        _clear_step6_dependencies(app)
-
-
-def test_pipeline_rfq_profile_reuses_stage_fetch_with_single_manager_get_rfq_call(
-    client, app
-):
-    fake_azure = FakeAzureOpenAIConnector()
-    manager = CountingManagerConnector()
-    intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
+    _override_dependencies(
         app,
         azure_connector=fake_azure,
         manager_connector=manager,
@@ -233,26 +170,31 @@ def test_pipeline_rfq_profile_reuses_stage_fetch_with_single_manager_get_rfq_cal
 
     try:
         session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
-        response = client.post(
-            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-            json={"content": "Who owns this RFQ and when is the deadline?"},
-        )
 
-        payload = response.json()
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what's the deadline?"},
+            )
+
         assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "tools_pipeline"
+        assert _log_values(caplog, "phase6.grounding_required")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
         assert manager.get_rfq_calls == 1
-        assert manager.get_rfq_stages_calls == 0
         assert intelligence.get_snapshot_calls == 0
-        assert payload["source_refs"][0]["artifact"] == "rfq"
     finally:
-        _clear_step6_dependencies(app)
+        _clear_dependencies(app)
 
 
-def test_pipeline_capability_status_turn_skips_tool_retrieval_calls(client, app):
-    fake_azure = FakeAzureOpenAIConnector()
+def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(client, app, caplog):
+    fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
+    _override_dependencies(
         app,
         azure_connector=fake_azure,
         manager_connector=manager,
@@ -261,62 +203,29 @@ def test_pipeline_capability_status_turn_skips_tool_retrieval_calls(client, app)
 
     try:
         session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
-        response = client.post(
-            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-            json={"content": "What is the briefing?"},
-        )
 
-        payload = response.json()
-        assert response.status_code == 200
-        assert payload["source_refs"] == []
-        assert payload["content"].startswith("I don't have grounded facts for")
-        assert manager.get_rfq_calls == 0
-        assert manager.get_rfq_stages_calls == 0
-        assert intelligence.get_snapshot_calls == 0
-    finally:
-        _clear_step6_dependencies(app)
-
-
-def test_pipeline_stage_resolution_failure_degrades_for_non_retrieval_turn(
-    client, app, caplog
-):
-    fake_azure = FakeAzureOpenAIConnector()
-    manager = CountingManagerConnector(fail_get_rfq=True)
-    intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
-        app,
-        azure_connector=fake_azure,
-        manager_connector=manager,
-        intelligence_connector=intelligence,
-    )
-
-    try:
         with caplog.at_level(logging.INFO):
-            session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
             response = client.post(
                 f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-                json={"content": "Hello"},
+                json={"content": "what is PWHT?"},
             )
 
-        payload = response.json()
         assert response.status_code == 200
-        assert payload["source_refs"] == []
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
-        assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
-        assert _log_values(caplog, "phase5.stage_resolved") == []
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert _log_values(caplog, "phase6.grounding_required") == []
+        assert _log_values(caplog, "phase6.grounding_satisfied") == []
+        assert manager.get_rfq_calls == 0
+        assert intelligence.get_snapshot_calls == 0
     finally:
-        _clear_step6_dependencies(app)
+        _clear_dependencies(app)
 
 
-def test_pipeline_stage_resolution_failure_with_profile_query_degrades_to_grounding_gap(
-    client,
-    app,
-    caplog,
-):
-    fake_azure = FakeAzureOpenAIConnector()
+def test_grounding_gap_when_tool_retrieval_attempt_fails(client, app, caplog):
+    fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector(fail_get_rfq=True)
     intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
+    _override_dependencies(
         app,
         azure_connector=fake_azure,
         manager_connector=manager,
@@ -324,29 +233,30 @@ def test_pipeline_stage_resolution_failure_with_profile_query_degrades_to_ground
     )
 
     try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
         with caplog.at_level(logging.INFO):
-            session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
             response = client.post(
                 f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-                json={"content": "Who owns this RFQ and when is the deadline?"},
+                json={"content": "what's the deadline?"},
             )
 
         assert response.status_code == 200
         assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
-        assert manager.get_rfq_calls == 2
     finally:
-        _clear_step6_dependencies(app)
+        _clear_dependencies(app)
 
 
-def test_pipeline_emits_required_phase5_fields_for_standard_turn(client, app, caplog):
-    fake_azure = FakeAzureOpenAIConnector()
+def test_grounding_mismatch_when_rfq_specific_but_no_tool_keyword_match(client, app, caplog):
+    fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
-    _override_step6_dependencies(
+    _override_dependencies(
         app,
         azure_connector=fake_azure,
         manager_connector=manager,
@@ -354,21 +264,136 @@ def test_pipeline_emits_required_phase5_fields_for_standard_turn(client, app, ca
     )
 
     try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
         with caplog.at_level(logging.INFO):
-            session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
             response = client.post(
                 f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-                json={"content": "What stage are we in?"},
+                json={"content": "tell me about this RFQ"},
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase5.stage_resolved")
-        assert _log_values(caplog, "phase5.role_applied")
-        assert _log_values(caplog, "phase5.role_fallback_used")
-        assert _log_values(caplog, "phase5.tools_keyword_matched")
-        assert _log_values(caplog, "phase5.tools_allowed_after_stage")
-        assert _log_values(caplog, "phase5.tools_allowed_after_role")
-        assert _log_values(caplog, "phase5.confidence_marker_emitted")
-        assert not _log_values(caplog, "phase5.capability_status_hit")
+        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+        assert _log_values(caplog, "phase6.grounding_required")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
+        assert _log_values(caplog, "phase6.grounding_mismatch")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
     finally:
-        _clear_step6_dependencies(app)
+        _clear_dependencies(app)
+
+
+def test_route_unsupported_dispatches_to_capability_status(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what's the briefing?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "unsupported"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "capability_status"
+        assert manager.get_rfq_calls == 0
+        assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_disambiguation_in_portfolio_session(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what's the status of this RFQ?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "disambiguation"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "disambiguation"
+        assert manager.get_rfq_calls == 0
+        assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_conversational_in_any_session(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "hello"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
+        assert manager.get_rfq_calls == 0
+        assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_general_knowledge_on_portfolio_session_uses_direct_llm(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "how does RT work?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert manager.get_rfq_calls == 0
+        assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
