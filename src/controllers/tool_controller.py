@@ -1,4 +1,4 @@
-"""Minimal explicit tool selection and execution for Phase 5 retrieval."""
+"""Explicit tool selection and execution for typed retrieval."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class RetrievalPlan(BaseModel):
-    """A small typed record describing one planned Phase 5 retrieval."""
+    """A small typed record describing one planned retrieval."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -45,7 +45,7 @@ class CapabilityStatusHit:
 
 
 class ToolController:
-    """Owns explicit Phase 5 tool selection and read-only execution."""
+    """Owns explicit tool selection and read-only execution."""
 
     stage_keywords = (
         "stage",
@@ -206,7 +206,7 @@ class ToolController:
         tool_names = {plan.tool_name for plan in role_filtered_plans}
         if len(tool_names) > 1:
             raise UnprocessableEntityError(
-                "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
+                "This retrieval request is ambiguous; ask for one RFQ fact at a time"
             )
         if role_filtered_plans:
             return role_filtered_plans[0]

@@ -12,5 +12,5 @@ def test_smoke_route_returns_expected_payload(client):
     assert response.json() == {
         "status": "ok",
         "service": "rfq_chatbot_ms",
-        "phase": "phase-5",
+        "phase": "phase-6",
     }

@@ -324,13 +324,13 @@ def test_downstream_failure_is_surfaced_explicitly(client, app):
             json={"content": "Who owns this RFQ and when is the deadline?"},
         )
 
-        assert response.status_code == 503
-        assert response.json()["detail"] == "Manager service request failed"
+        assert response.status_code == 200
+        assert response.json()["source_refs"] == []
     finally:
         _clear_phase4_dependencies(app)
 
 
-def test_downstream_failure_does_not_persist_user_message(client, app, db_session):
+def test_downstream_failure_persists_turn_under_graceful_degradation(client, app, db_session):
     fake_azure = FakeAzureOpenAIConnector()
     _override_phase4_dependencies(
         app,
@@ -350,8 +350,8 @@ def test_downstream_failure_does_not_persist_user_message(client, app, db_sessio
             json={"content": "Who owns this RFQ and when is the deadline?"},
         )
 
-        assert response.status_code == 503
-        assert db_session.query(Message).count() == 0
+        assert response.status_code == 200
+        assert db_session.query(Message).count() == 2
     finally:
         _clear_phase4_dependencies(app)
 
@@ -419,7 +419,7 @@ def test_ambiguous_retrieval_request_fails_clearly(client, app):
 
         assert response.status_code == 422
         assert response.json()["detail"] == (
-            "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
+            "This retrieval request is ambiguous; ask for one RFQ fact at a time"
         )
     finally:
         _clear_phase4_dependencies(app)

@@ -1,4 +1,4 @@
-"""Phase 5 prompt assembly with stable-prefix behavioral directives."""
+"""Phase 6 prompt assembly with stable-prefix behavioral directives."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ CONFIDENCE_PATTERN_MARKER = "Confidence: pattern-based (validated against 1 samp
 
 
 class ContextBuilder:
-    """Build the prompt envelope from history, retrieved facts, and Phase 5 signals."""
+    """Build the prompt envelope from history, retrieved facts, and Phase 5/6 signals."""
 
     system_prompt = (
         "You are RFQ Copilot, a conversational assistant for estimation engineers "
