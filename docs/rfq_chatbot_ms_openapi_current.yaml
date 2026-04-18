@@ -15,6 +15,9 @@ info:
       * Phase 4 — read-only retrieval from `rfq_manager_ms` and
         `rfq_intelligence_ms`, surfaced through provenance-bearing
         `source_refs[]` on assistant messages.
+      * Phase 5 — deterministic intent/routing/grounding/disambiguation control layer.
+      * Phase 6 — unsupported capability requests are handled with absence-style
+        guidance and `200` responses.
 
     Items intentionally deferred (and therefore **not** present in this contract):
       * Briefing, workbook, analytics, and portfolio-search retrieval tools.
@@ -191,7 +194,7 @@ paths:
       tags: [Chat]
       summary: Submit one user turn on a session
       description: |
-        Runs one full turn through the Phase 4 chat pipeline:
+        Runs one full turn through the current deterministic chat pipeline:
 
         1. Load the session (404 if missing).
         2. Get-or-create the single conversation for that session.
@@ -205,7 +208,8 @@ paths:
                priority / workflow / rfq code / rfq status → `get_rfq_profile`
                (manager).
              * Keywords for briefing / workbook / analytics / portfolio /
-               grand total / final price → 422 (intentionally unsupported).
+               grand total / final price are handled by the capability-status
+               path as `200` absence guidance (no retrieval).
              * Multiple matching tool families in a single turn → 422 (ambiguous).
         4. If retrieval is planned, the session **must** be `rfq_bound` and
            `session.rfq_id` **must** parse as a UUID; human-readable RFQ codes
@@ -240,8 +244,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "422":
           description: |
-            Unsupported retrieval, ambiguous retrieval plan, missing/invalid
-            RFQ binding for retrieval, or request body validation error.
+            Ambiguous retrieval plan, missing/invalid RFQ binding for
+            retrieval, or request body validation error.
           content:
             application/json:
               schema:
@@ -336,7 +340,7 @@ components:
           example: rfq_chatbot_ms
         phase:
           type: string
-          example: phase-4
+          example: phase-6
 
     SessionEntryMode:
       type: string

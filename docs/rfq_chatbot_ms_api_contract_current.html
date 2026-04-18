@@ -142,7 +142,7 @@
         <span><strong>Date:</strong> April 2026</span>
         <span><strong>Endpoints:</strong> 7</span>
         <span><strong>Tables:</strong> 3</span>
-        <span><strong>Phase:</strong> Phase 4 — typed retrieval baseline</span>
+        <span><strong>Phase:</strong> Phase 6 — deterministic control and capability-status behavior</span>
         <span><strong>Status:</strong> Live / Active</span>
       </div>
       <div class="source-note">
@@ -206,9 +206,14 @@
             <td>Three tools: <code>get_rfq_profile</code>, <code>get_rfq_stage</code>, <code>get_rfq_snapshot</code>.</td>
           </tr>
           <tr>
+            <td>Phase 5/6 — deterministic intent routing and capability handling</td>
+            <td><span class="tag-current">Implemented</span></td>
+            <td>Unsupported capability asks are handled with grounded absence guidance and <code>200</code> responses.</td>
+          </tr>
+          <tr>
             <td>Briefing / workbook / analytics / portfolio retrieval</td>
             <td><span class="tag-blocked">Not supported</span></td>
-            <td>Matching keywords return <code>422</code> by design.</td>
+            <td>Matching keywords are handled by capability-status messaging (no retrieval call).</td>
           </tr>
           <tr>
             <td>AuthN/AuthZ (JWT, IAM)</td>
@@ -270,7 +275,7 @@
           <span class="ui-tag">bootstrap verification</span>
         </div>
         <div class="endpoint-body">
-          Returns <code>{ "status": "ok", "service": "rfq_chatbot_ms", "phase": "phase-4" }</code>.
+          Returns <code>{ "status": "ok", "service": "rfq_chatbot_ms", "phase": "phase-6" }</code>.
           Proves the v1 router stack is wired.
         </div>
       </div>
@@ -347,7 +352,7 @@
             <li>Loads the session (<code>404</code> if missing).</li>
             <li>Gets-or-creates the single conversation for that session.</li>
             <li>Plans retrieval from the user content using keyword routing
-              (see <em>Section 4 — Phase 4 retrieval</em>).</li>
+              (see <em>Section 4 — retrieval tools &amp; provenance</em>).</li>
             <li>If retrieval is planned, the session must be <code>rfq_bound</code> and
               <code>session.rfq_id</code> must parse as a UUID; human-readable RFQ codes such as
               <code>IF-25144</code> raise <code>422</code>.</li>
@@ -356,7 +361,7 @@
             <li><code>tool_calls</code> are persisted but not surfaced on the response DTO.
               Only <code>source_refs[]</code> are returned.</li>
           </ul>
-          Error mapping: <code>422</code> (unsupported / ambiguous retrieval, missing or
+          Error mapping: <code>422</code> (ambiguous retrieval, missing or
           non-UUID <code>rfq_id</code>, validation), <code>429</code> (Azure OpenAI rate limit
           after retries), <code>503</code> (upstream failure), <code>504</code> (upstream timeout).
         </div>
@@ -430,7 +435,8 @@
         <strong>Tool selection is keyword-based and single-tool-per-turn.</strong>
         Two matching tool families in one user turn raise <code>422</code> ("ambiguous").
         Briefing, workbook review, analytics, portfolio search, grand-total, and final-price
-        keywords raise <code>422</code> by design — these tools are not implemented yet.
+        keywords are handled by capability-status messaging (absence guidance) — these tools are
+        not implemented yet.
       </div>
 
       <div class="callout">
@@ -445,10 +451,10 @@
 
 
     <!-- ═══════════════════════════════════════════ -->
-    <!-- SECTION 4 — PHASE 4 RETRIEVAL               -->
+    <!-- SECTION 4 — RETRIEVAL                        -->
     <!-- ═══════════════════════════════════════════ -->
     <section>
-      <h2>4. Phase 4 Retrieval — Tools &amp; Provenance</h2>
+      <h2>4. Retrieval — Tools &amp; Provenance</h2>
       <span class="section-sub">
         Three read-only tools are wired, each scoped to a single RFQ id. Every tool result is
         wrapped in a <code>ToolResultEnvelope</code> carrying a <code>SourceRef</code> for provenance.
@@ -486,7 +492,7 @@
             <td><span class="tag-blocked">Unsupported</span></td>
             <td>briefing, workbook review, workbook profile, analytics, stats, list rfqs, portfolio, grand total, final price, estimation amount</td>
             <td>—</td>
-            <td>422 by design</td>
+            <td>Handled as capability-status absence guidance (no retrieval)</td>
           </tr>
         </tbody>
       </table>

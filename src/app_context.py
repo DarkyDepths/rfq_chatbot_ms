@@ -27,7 +27,7 @@ def get_smoke_payload() -> dict[str, str]:
     return {
         "status": "ok",
         "service": "rfq_chatbot_ms",
-        "phase": "phase-5",
+        "phase": "phase-6",
     }
 
 

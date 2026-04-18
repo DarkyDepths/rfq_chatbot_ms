@@ -133,7 +133,10 @@ class IntentController:
         ):
             return True
 
-        # Domain-adjacent RFQ phrasing in portfolio mode is treated as ambiguity.
+        # Domain-adjacent RFQ vocabulary (deadline, owner, status, etc.) scoped to
+        # rfq_bound sessions would normally trigger rfq_specific. In a portfolio
+        # session, the same vocabulary indicates the user is referencing an RFQ
+        # we cannot identify, so treat as disambiguation instead.
         if self._session_mode_value(session) != SessionMode.PORTFOLIO.value:
             return False
 
@@ -221,7 +224,7 @@ class IntentController:
         normalized_content: str,
         session: ChatbotSession,
     ) -> bool:
-        # Preserves the historical Phase 5 graceful-degradation beat in RFQ-bound sessions.
+        # Retained intentionally to preserve approved Phase 5 regression safety.
         return (
             normalized_content == "hello copilot"
             and self._session_mode_value(session) == SessionMode.RFQ_BOUND.value

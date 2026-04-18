@@ -453,6 +453,14 @@ class ChatController:
 
     @staticmethod
     def _build_retrieval_failure_record(exc: Exception) -> ToolCallRecord:
+        """Wrap an upstream retrieval failure as an ABSENT tool record.
+
+        This converts the exception into a tool call record so that the
+        grounding check can detect the failure case (tool_planner_fired=True,
+        has_evidence=False) without special-casing the exception path.
+        The ABSENT confidence ensures has_evidence evaluates to False,
+        triggering grounding-gap absence injection.
+        """
         return ToolCallRecord(
             tool_name="retrieval_unavailable",
             arguments={
