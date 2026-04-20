@@ -185,7 +185,7 @@ def test_route_rfq_specific_uses_tools_pipeline(client, app, caplog):
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
         assert manager.get_rfq_calls == 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 
@@ -215,8 +215,8 @@ def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(clie
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert _log_values(caplog, "phase6.grounding_satisfied") == []
-        assert manager.get_rfq_calls == 0
-        assert intelligence.get_snapshot_calls == 0
+        assert manager.get_rfq_calls == 1
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 

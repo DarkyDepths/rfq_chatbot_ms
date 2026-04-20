@@ -27,11 +27,27 @@ class IntentClassification:
 class IntentController:
     """Classifies user turns using deterministic patterns and session context."""
 
+    continuity_max_word_count = 6
+    continuity_follow_up_cues = (
+        "and",
+        "also",
+        "what about",
+        "how about",
+        "this",
+        "that",
+        "it",
+        "its",
+        "same",
+        "then",
+        "next",
+    )
+
     def classify_intent(
         self,
         user_content: str,
         session: ChatbotSession,
         last_assistant_content: str | None,
+        last_resolved_intent: str | None = None,
     ) -> IntentClassification:
         """Classify one user turn into the frozen 5-intent taxonomy."""
 
@@ -82,6 +98,7 @@ class IntentController:
         classified_intent = self._classify_normal(
             normalized_content=normalized_content,
             session=session,
+            last_resolved_intent=last_resolved_intent,
         )
         return IntentClassification(
             intent=classified_intent,
@@ -95,6 +112,7 @@ class IntentController:
         *,
         normalized_content: str,
         session: ChatbotSession,
+        last_resolved_intent: str | None = None,
     ) -> str:
         if self._matches_intent(
             normalized_content=normalized_content,
@@ -123,7 +141,39 @@ class IntentController:
         ):
             return "general_knowledge"
 
+        if self._should_apply_rfq_continuity_tiebreaker(
+            normalized_content=normalized_content,
+            user_content=normalized_content,
+            session=session,
+            last_resolved_intent=last_resolved_intent,
+        ):
+            return "rfq_specific"
+
         return FALLBACK_INTENT
+
+    def _should_apply_rfq_continuity_tiebreaker(
+        self,
+        *,
+        normalized_content: str,
+        user_content: str,
+        session: ChatbotSession,
+        last_resolved_intent: str | None,
+    ) -> bool:
+        if last_resolved_intent != "rfq_specific":
+            return False
+
+        if self._session_mode_value(session) != SessionMode.RFQ_BOUND.value:
+            return False
+
+        if self._word_count(user_content) == 0:
+            return False
+
+        if self._word_count(user_content) > self.continuity_max_word_count:
+            return False
+
+        return any(
+            cue in normalized_content for cue in self.continuity_follow_up_cues
+        )
 
     def _matches_disambiguation(self, *, normalized_content: str, session: ChatbotSession) -> bool:
         if self._matches_intent(

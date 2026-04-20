@@ -149,3 +149,20 @@ def test_successful_resolution_calls_manager_get_rfq_exactly_once():
     controller.resolve_stage(_session(SessionMode.RFQ_BOUND, str(uuid.uuid4())))
 
     assert connector.calls == 1
+
+
+def test_preloaded_rfq_detail_skips_manager_call_and_resolves_stage_profile():
+    known_stage_id = next(iter(STAGE_PROFILES.keys()))
+    detail = _rfq_detail_with_stage(known_stage_id)
+    connector = FakeManagerConnector(rfq_detail=detail)
+    controller = StageController(manager_connector=connector)
+
+    resolution = controller.resolve_stage(
+        _session(SessionMode.RFQ_BOUND, str(uuid.uuid4())),
+        preloaded_rfq_detail=detail,
+    )
+
+    assert resolution.profile == STAGE_PROFILES[known_stage_id]
+    assert resolution.rfq_detail == detail
+    assert resolution.stage_id == known_stage_id
+    assert connector.calls == 0

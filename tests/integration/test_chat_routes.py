@@ -35,16 +35,25 @@ class FakeAzureOpenAIConnector:
 
     def create_chat_completion(self, messages, tools=None):
         self.calls.append({"messages": messages, "tools": tools})
-        prompt = messages[1]["content"]
-        if '"owner": "Sarah"' in prompt and '"deadline": "2026-05-01"' in prompt:
-            return ChatCompletionResult(
-                assistant_text="The RFQ owner is Sarah and the deadline is 2026-05-01."
-            )
-        if '"overall_status": "partial"' in prompt:
+        prompt = messages[-1]["content"]
+        if (
+            "Selection reason: User asked for the current RFQ snapshot or currently known facts"
+            in prompt
+            and '"overall_status": "partial"' in prompt
+        ):
             return ChatCompletionResult(
                 assistant_text=(
                     "The current RFQ snapshot is partial and intelligence briefing is available."
                 )
+            )
+
+        if (
+            "Selection reason: User asked about RFQ profile metadata from manager" in prompt
+            and '"owner": "Sarah"' in prompt
+            and '"deadline": "2026-05-01"' in prompt
+        ):
+            return ChatCompletionResult(
+                assistant_text="The RFQ owner is Sarah and the deadline is 2026-05-01."
             )
         return ChatCompletionResult(assistant_text=f"assistant-response-{len(self.calls)}")
 
@@ -299,7 +308,10 @@ def test_turn_with_intelligence_backed_retrieval_returns_grounded_answer(client,
         assert response.json()["content"] == (
             "The current RFQ snapshot is partial and intelligence briefing is available."
         )
-        assert response.json()["source_refs"][0]["system"] == "rfq_intelligence_ms"
+        assert any(
+            source_ref["system"] == "rfq_intelligence_ms"
+            for source_ref in response.json()["source_refs"]
+        )
     finally:
         _clear_phase4_dependencies(app)
 
@@ -325,7 +337,8 @@ def test_downstream_failure_is_surfaced_explicitly(client, app):
         )
 
         assert response.status_code == 200
-        assert response.json()["source_refs"] == []
+        assert response.json()["source_refs"]
+        assert response.json()["source_refs"][0]["system"] == "rfq_intelligence_ms"
     finally:
         _clear_phase4_dependencies(app)
 

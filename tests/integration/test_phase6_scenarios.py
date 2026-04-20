@@ -43,7 +43,11 @@ class ScenarioAzureConnector:
     def create_chat_completion(self, messages, tools=None):
         self.calls.append({"messages": messages, "tools": tools})
         stable_prefix = messages[0]["content"]
-        variable_suffix = messages[1]["content"]
+        variable_suffix = messages[-1]["content"]
+        latest_user_turn = variable_suffix.lower()
+        latest_turn_marker = "latest user turn:\n"
+        if latest_turn_marker in latest_user_turn:
+            latest_user_turn = latest_user_turn.split(latest_turn_marker, 1)[1]
 
         if "Disambiguation behavior: RFQ resolution mode." in stable_prefix:
             return ChatCompletionResult(
@@ -62,12 +66,12 @@ class ScenarioAzureConnector:
             template_line = stable_prefix.split("template exactly: ", 1)[1].split("\n", 1)[0]
             return ChatCompletionResult(assistant_text=template_line)
 
-        if "pwht" in variable_suffix.lower():
+        if "pwht" in latest_user_turn:
             return ChatCompletionResult(
                 assistant_text="PWHT is post-weld heat treatment used to reduce residual stress."
             )
 
-        if "rt" in variable_suffix.lower():
+        if "rt" in latest_user_turn:
             return ChatCompletionResult(
                 assistant_text="RT is radiographic testing used to detect internal weld defects."
             )
@@ -225,7 +229,7 @@ def test_phase6_scenario_1_intent_rfq_specific_on_bound_session(client, app, cap
         assert _log_values(caplog, "phase5.tools_allowed_after_role")[-1] == ["get_rfq_profile"]
         assert payload["source_refs"]
         assert manager.get_rfq_calls == 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 
@@ -247,8 +251,8 @@ def test_phase6_scenario_2_intent_general_knowledge_on_bound_session(client, app
         assert response.status_code == 200
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
-        assert manager.get_rfq_calls == 0
-        assert intelligence.get_snapshot_calls == 0
+        assert manager.get_rfq_calls == 1
+        assert intelligence.get_snapshot_calls == 1
 
         stable_prefix = azure.calls[-1]["messages"][0]["content"]
         assert "Role tone directive: Respond in a decision-oriented executive tone." in stable_prefix
@@ -331,7 +335,7 @@ def test_phase6_scenario_6_grounding_enforcement_with_tool_success(client, app, 
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
         assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
         assert manager.get_rfq_calls == 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 
@@ -352,7 +356,7 @@ def test_phase6_scenario_7_grounding_enforcement_with_tool_failure(client, app, 
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert manager.get_rfq_calls >= 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 
@@ -374,7 +378,7 @@ def test_phase6_scenario_8_grounding_mismatch_no_tool_keyword_match(client, app,
         assert _log_values(caplog, "phase6.grounding_mismatch")[-1] is True
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert manager.get_rfq_calls == 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 
@@ -453,7 +457,7 @@ def test_phase6_scenario_12_output_guardrail_soft_enforcement(client, app, caplo
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
         assert manager.get_rfq_calls == 1
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_dependencies(app)
 

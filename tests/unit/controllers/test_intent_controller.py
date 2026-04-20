@@ -210,3 +210,29 @@ def test_whitespace_user_content_defaults_to_conversational():
     )
 
     assert result.intent == "conversational"
+
+
+def test_short_ambiguous_follow_up_uses_rfq_specific_continuity_tiebreaker():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="and this one?",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+        last_resolved_intent="rfq_specific",
+    )
+
+    assert result.intent == "rfq_specific"
+
+
+def test_clear_general_knowledge_signal_overrides_rfq_continuity_tiebreaker():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="what is pwht?",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+        last_resolved_intent="rfq_specific",
+    )
+
+    assert result.intent == "general_knowledge"

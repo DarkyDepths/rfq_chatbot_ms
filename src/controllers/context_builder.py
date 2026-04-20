@@ -31,6 +31,7 @@ class ContextBuilder:
         self,
         recent_messages,
         retrieval_context_blocks=None,
+        supplemental_context_blocks=None,
         latest_user_turn: str | None = None,
         stage_resolution=None,
         role_resolution=None,
@@ -38,6 +39,8 @@ class ContextBuilder:
         any_pattern_based_tool_fired: bool = False,
         grounding_gap: bool = False,
         capability_status_hit=None,
+        turn_guidance_lines: list[str] | None = None,
+        include_history_in_variable_suffix: bool = True,
     ) -> PromptEnvelope:
         """Return the frozen PromptEnvelope contract for the current turn."""
 
@@ -48,14 +51,17 @@ class ContextBuilder:
             any_pattern_based_tool_fired=any_pattern_based_tool_fired,
             grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
+            turn_guidance_lines=turn_guidance_lines,
         )
 
         variable_suffix = self._build_variable_suffix(
             recent_messages=recent_messages,
             retrieval_context_blocks=retrieval_context_blocks,
+            supplemental_context_blocks=supplemental_context_blocks,
             latest_user_turn=latest_user_turn,
             disambiguation_context=disambiguation_context,
             capability_status_hit=capability_status_hit,
+            include_history=include_history_in_variable_suffix,
         )
 
         return PromptEnvelope(
@@ -73,6 +79,7 @@ class ContextBuilder:
         any_pattern_based_tool_fired: bool,
         grounding_gap: bool,
         capability_status_hit,
+        turn_guidance_lines: list[str] | None,
     ) -> str:
         role_profile = ROLE_PROFILES[FALLBACK_ROLE]
         if role_resolution is not None and getattr(role_resolution, "profile", None):
@@ -130,6 +137,10 @@ class ContextBuilder:
                 list(GROUNDING_RULES_SECTION_LINES),
             ),
         ]
+        if turn_guidance_lines:
+            prefix_sections.append(
+                self._render_xml_section("turn_guidance", list(turn_guidance_lines))
+            )
         return "\n\n".join(prefix_sections)
 
     @staticmethod
@@ -169,13 +180,24 @@ class ContextBuilder:
         *,
         recent_messages,
         retrieval_context_blocks,
+        supplemental_context_blocks,
         latest_user_turn: str | None,
         disambiguation_context: dict | None,
         capability_status_hit,
+        include_history: bool,
     ) -> str:
-        transcript_lines = ["Conversation history:"]
-        for message in recent_messages:
-            transcript_lines.append(f"{message.role}: {message.content}")
+        transcript_lines: list[str] = []
+
+        if include_history:
+            transcript_lines.append("Conversation history:")
+            for message in recent_messages:
+                transcript_lines.append(f"{message.role}: {message.content}")
+
+        if supplemental_context_blocks:
+            if transcript_lines:
+                transcript_lines.append("")
+            transcript_lines.append("Session context:")
+            transcript_lines.extend(supplemental_context_blocks)
 
         # Capability-status and disambiguation modes are no-retrieval paths.
         if (
@@ -183,12 +205,20 @@ class ContextBuilder:
             and capability_status_hit is None
             and disambiguation_context is None
         ):
-            transcript_lines.append("")
+            if transcript_lines:
+                transcript_lines.append("")
             transcript_lines.append("Retrieved facts:")
             transcript_lines.extend(retrieval_context_blocks)
 
         if latest_user_turn:
-            transcript_lines.append(f"user: {latest_user_turn}")
+            if transcript_lines and not include_history:
+                transcript_lines.append("")
+            if include_history:
+                transcript_lines.append(f"user: {latest_user_turn}")
+            else:
+                transcript_lines.append("Latest user turn:")
+                transcript_lines.append(latest_user_turn)
 
-        transcript_lines.append("assistant:")
+        if include_history:
+            transcript_lines.append("assistant:")
         return "\n".join(transcript_lines)

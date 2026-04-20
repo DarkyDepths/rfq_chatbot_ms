@@ -41,7 +41,7 @@ class EchoAzureOpenAIConnector:
 
     def create_chat_completion(self, messages, tools=None):
         stable_prefix = messages[0]["content"]
-        variable_suffix = messages[1]["content"]
+        variable_suffix = messages[-1]["content"]
         self.calls.append(
             {
                 "messages": messages,
@@ -55,7 +55,10 @@ class EchoAzureOpenAIConnector:
             template_line = stable_prefix.split("template exactly: ", 1)[1].split("\n", 1)[0]
             return ChatCompletionResult(assistant_text=template_line)
 
-        if "Tool: get_rfq_snapshot" in variable_suffix:
+        if (
+            "Selection reason: User asked for the current RFQ snapshot or currently known facts"
+            in variable_suffix
+        ):
             return ChatCompletionResult(
                 assistant_text=(
                     "Snapshot-based answer.\n"
