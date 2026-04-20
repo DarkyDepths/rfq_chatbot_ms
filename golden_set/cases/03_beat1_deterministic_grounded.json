@@ -1,0 +1,23 @@
+{
+  "id": "beat1_deterministic_grounded",
+  "description": "Defense beat 1: deterministic grounded answer with provenance-bearing tool path.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "Who owns this RFQ and what is the deadline?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_profile"],
+        "source_refs_present": true,
+        "required_patterns": ["owner is sarah", "deadline is 2026-05-01"],
+        "forbidden_patterns": ["cannot retrieve"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

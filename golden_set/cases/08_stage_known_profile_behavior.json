@@ -1,0 +1,26 @@
+{
+  "id": "stage_known_profile_behavior",
+  "description": "Known stage profile applies Go / No-Go framing.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "known_stage",
+    "intelligence_mode": "ok"
+  },
+  "turns": [
+    {
+      "user_content": "What stage is this RFQ in?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_stage"],
+        "source_refs_present": true,
+        "required_patterns": ["go\\s*/\\s*no-go", "qualification risk"],
+        "stable_prefix_required": ["Stage framing: Treat the RFQ as being in Go / No-Go", "Current stage label: Go / No-Go"]
+      }
+    }
+  ]
+}

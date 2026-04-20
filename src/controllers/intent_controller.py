@@ -53,14 +53,6 @@ class IntentController:
 
         normalized_content = self._normalize(user_content)
 
-        if self._is_phase5_legacy_rfq_greeting(normalized_content, session):
-            return IntentClassification(
-                intent="rfq_specific",
-                disambiguation_resolved=False,
-                resolved_rfq_reference=None,
-                disambiguation_abandoned=False,
-            )
-
         if self._is_disambiguation_prompt(last_assistant_content):
             if self._word_count(user_content) <= MAX_RESOLUTION_WORD_COUNT:
                 resolved_reference = self._extract_rfq_reference(user_content)
@@ -268,14 +260,3 @@ class IntentController:
             if match is not None:
                 return match.group(0)
         return None
-
-    def _is_phase5_legacy_rfq_greeting(
-        self,
-        normalized_content: str,
-        session: ChatbotSession,
-    ) -> bool:
-        # Retained intentionally to preserve approved Phase 5 regression safety.
-        return (
-            normalized_content == "hello copilot"
-            and self._session_mode_value(session) == SessionMode.RFQ_BOUND.value
-        )

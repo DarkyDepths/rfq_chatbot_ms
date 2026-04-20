@@ -1,0 +1,21 @@
+{
+  "id": "beat3_honest_absence",
+  "description": "Defense beat 3: unsupported capability returns honest absence with named future condition.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What is the briefing for this RFQ?",
+      "expect": {
+        "intent": "unsupported",
+        "route": "capability_status",
+        "tools_include": ["get_capability_status"],
+        "source_refs_present": false,
+        "required_patterns": ["don't have grounded facts for RFQ intelligence briefing retrieval", "available after briefing rollout"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "stage_fallback_default_profile",
+  "description": "Unknown stage id applies default neutral stage framing.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "default_stage",
+    "intelligence_mode": "ok"
+  },
+  "turns": [
+    {
+      "user_content": "What stage is this RFQ in?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_stage"],
+        "source_refs_present": true,
+        "required_patterns": ["neutral stage framing"],
+        "stable_prefix_required": ["Use neutral stage framing when exact stage context is unavailable"],
+        "stable_prefix_forbidden": ["Stage framing: Treat the RFQ as being in Go / No-Go"]
+      }
+    }
+  ]
+}

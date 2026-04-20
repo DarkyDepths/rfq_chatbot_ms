@@ -92,16 +92,22 @@ def test_deadline_question_in_portfolio_session_is_disambiguation():
     assert result.intent == "disambiguation"
 
 
-def test_hello_is_conversational():
+def test_hello_is_conversational_in_portfolio_and_rfq_bound_modes():
     controller = IntentController()
 
-    result = controller.classify_intent(
+    portfolio_result = controller.classify_intent(
         user_content="hello copilot",
         session=_session(SessionMode.PORTFOLIO),
         last_assistant_content=None,
     )
+    rfq_bound_result = controller.classify_intent(
+        user_content="hello copilot",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
 
-    assert result.intent == "conversational"
+    assert portfolio_result.intent == "conversational"
+    assert rfq_bound_result.intent == "conversational"
 
 
 def test_briefing_question_is_unsupported():

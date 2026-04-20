@@ -1,0 +1,23 @@
+{
+  "id": "beat4_role_contrast_estimation",
+  "description": "Defense beat 4 (estimation role): role framing produces working-level answer.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What's the margin and deadline for this RFQ?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_profile"],
+        "source_refs_present": true,
+        "required_patterns": ["working-level margin detail"],
+        "forbidden_patterns": ["executive margin summary"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

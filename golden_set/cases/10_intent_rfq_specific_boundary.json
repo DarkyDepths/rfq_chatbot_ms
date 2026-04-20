@@ -1,0 +1,21 @@
+{
+  "id": "intent_rfq_specific_boundary",
+  "description": "RFQ-bound deadline query stays in rfq_specific tools pipeline.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What's the deadline?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_profile"],
+        "source_refs_present": true,
+        "required_patterns": ["deadline is 2026-05-01"]
+      }
+    }
+  ]
+}
