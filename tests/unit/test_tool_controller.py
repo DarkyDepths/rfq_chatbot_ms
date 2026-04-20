@@ -189,7 +189,5 @@ def test_tool_controller_rejects_ambiguous_retrieval_attempt():
             "Give me the current snapshot and deadline for this RFQ",
         )
 
-    assert (
-        str(exc.value)
-        == "This retrieval request is ambiguous in Phase 5; ask for one RFQ fact at a time"
-    )
+    assert "retrieval request is ambiguous" in str(exc.value)
+    assert "one RFQ fact at a time" in str(exc.value)

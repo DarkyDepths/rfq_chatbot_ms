@@ -13,6 +13,10 @@ def test_capability_status_entries_keys_match_phase4_unsupported_keywords():
         "grand total",
         "final price",
         "estimation amount",
+        "historical comparison",
+        "similar rfq",
+        "supplier recommendation",
+        "material pricing",
     }
 
 

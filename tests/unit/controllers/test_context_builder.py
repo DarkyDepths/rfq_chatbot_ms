@@ -44,6 +44,40 @@ def test_context_builder_returns_prompt_envelope_with_frozen_public_fields():
         "variable_suffix",
         "total_budget",
     ]
+    for tag in [
+        "persona",
+        "domain_constraints",
+        "domain_vocabulary",
+        "response_rules",
+        "role_framing",
+        "stage_framing",
+        "confidence_behavior",
+        "grounding_rules",
+    ]:
+        assert f"<{tag}>" in prompt.stable_prefix
+        assert f"</{tag}>" in prompt.stable_prefix
+
+
+def test_stable_prefix_includes_phase7_domain_vocabulary_and_response_rules():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="hello")],
+        latest_user_turn="What is PWHT?",
+    )
+
+    assert "MR package" in prompt.stable_prefix
+    assert "BOQ" in prompt.stable_prefix
+    assert "PWHT" in prompt.stable_prefix
+    assert "RT" in prompt.stable_prefix
+    assert "U-Stamp / NB registration" in prompt.stable_prefix
+    assert "SAMSS / SAES / SAEP" in prompt.stable_prefix
+    assert "cost-per-ton" in prompt.stable_prefix
+    assert "Lead with the direct answer" in prompt.stable_prefix
+    assert "Use markdown formatting when useful" in prompt.stable_prefix
+    assert "Keep responses concise by default" in prompt.stable_prefix
+    assert "source system and artifact" in prompt.stable_prefix
+    assert "Avoid fabrication when evidence is missing" in prompt.stable_prefix
 
 
 def test_stable_prefix_changes_with_role_profile_directives():

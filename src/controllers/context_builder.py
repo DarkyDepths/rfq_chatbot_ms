@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+from src.config.prompt_templates import (
+    CAPABILITY_ABSENCE_CONFIDENCE_TEMPLATE_LINES,
+    DETERMINISTIC_CONFIDENCE_LINES,
+    DISAMBIGUATION_LINES,
+    DOMAIN_CONSTRAINTS_SECTION_LINES,
+    DOMAIN_VOCABULARY_SECTION_LINES,
+    GROUNDING_GAP_CONFIDENCE_LINES,
+    GROUNDING_RULES_SECTION_LINES,
+    PATTERN_BASED_CONFIDENCE_TEMPLATE_LINES,
+    PERSONA_SECTION_LINES,
+    RESPONSE_RULES_SECTION_LINES,
+)
 from src.config.role_profiles import FALLBACK_ROLE, ROLE_PROFILES
 from src.models.prompt import PromptEnvelope
 
@@ -12,14 +24,6 @@ CONFIDENCE_PATTERN_MARKER = "Confidence: pattern-based (validated against 1 samp
 class ContextBuilder:
     """Build the prompt envelope from history, retrieved facts, and Phase 5/6 signals."""
 
-    system_prompt = (
-        "You are RFQ Copilot, a conversational assistant for estimation engineers "
-        "working on industrial RFQs. In this phase you may receive retrieved "
-        "read-only RFQ facts from manager or intelligence services. Use those "
-        "retrieved facts faithfully, do not invent missing RFQ specifics, and say "
-        "clearly when information is unavailable. For general questions without "
-        "retrieved facts, answer helpfully and honestly."
-    )
     history_window_size = 6
     total_budget = 4000
 
@@ -92,42 +96,46 @@ class ContextBuilder:
             capability_status_hit=capability_status_hit,
         )
 
+        role_lines = [
+            f"Role tone directive: {role_profile['tone_directive']}",
+            f"Role depth directive: {role_profile['depth_directive']}",
+        ]
+
         stage_lines = [f"Stage framing: {stage_fragment}"]
         if stage_name:
             stage_lines.append(f"Current stage label: {stage_name}")
 
-        disambiguation_lines: list[str] = []
         if disambiguation_context is not None:
-            disambiguation_lines = [
-                "Disambiguation behavior: RFQ resolution mode.",
-                (
-                    "The user asked a question that references an RFQ, but no RFQ is "
-                    "bound to this session."
-                ),
-                (
-                    "Generate a clarification response asking the user to identify which "
-                    "RFQ they mean."
-                ),
-                (
-                    "You may ask for an RFQ code (e.g., IF-25144, RFQ-01) or suggest "
-                    "the user bind their session."
-                ),
-                "Do not answer the user's question directly. Ask for clarification only.",
-            ]
+            stage_lines.extend(DISAMBIGUATION_LINES)
 
-        prefix_lines = [
-            self.system_prompt,
-            "",
-            f"Role tone directive: {role_profile['tone_directive']}",
-            f"Role depth directive: {role_profile['depth_directive']}",
-            "",
-            *stage_lines,
-            "",
-            *disambiguation_lines,
-            *( [""] if disambiguation_lines else [] ),
-            *confidence_directives,
+        prefix_sections = [
+            self._render_xml_section("persona", list(PERSONA_SECTION_LINES)),
+            self._render_xml_section(
+                "domain_constraints",
+                list(DOMAIN_CONSTRAINTS_SECTION_LINES),
+            ),
+            self._render_xml_section(
+                "domain_vocabulary",
+                list(DOMAIN_VOCABULARY_SECTION_LINES),
+            ),
+            self._render_xml_section(
+                "response_rules",
+                list(RESPONSE_RULES_SECTION_LINES),
+            ),
+            self._render_xml_section("role_framing", role_lines),
+            self._render_xml_section("stage_framing", stage_lines),
+            self._render_xml_section("confidence_behavior", confidence_directives),
+            self._render_xml_section(
+                "grounding_rules",
+                list(GROUNDING_RULES_SECTION_LINES),
+            ),
         ]
-        return "\n".join(prefix_lines)
+        return "\n\n".join(prefix_sections)
+
+    @staticmethod
+    def _render_xml_section(tag: str, lines: list[str]) -> str:
+        section_lines = [f"<{tag}>", *lines, f"</{tag}>"]
+        return "\n".join(section_lines)
 
     @staticmethod
     def _build_confidence_directives(
@@ -138,44 +146,23 @@ class ContextBuilder:
     ) -> list[str]:
         if capability_status_hit is not None:
             return [
-                "Confidence behavior: capability absence response mode.",
-                (
-                    "If the user asks for this unsupported capability, respond using this "
-                    "template exactly: I don't have grounded facts for "
-                    f"{capability_status_hit.capability_name} yet because "
-                    f"{capability_status_hit.named_future_condition}."
-                ),
-                "Optionally add one sentence redirecting to capabilities you can answer now.",
-                "Do not invent any capability status beyond the provided condition.",
-                "Do not append any confidence marker line for this response mode.",
+                line.format(
+                    capability_name=capability_status_hit.capability_name,
+                    named_future_condition=capability_status_hit.named_future_condition,
+                )
+                for line in CAPABILITY_ABSENCE_CONFIDENCE_TEMPLATE_LINES
             ]
 
         if grounding_gap:
-            return [
-                "Grounding behavior: grounding gap mode.",
-                (
-                    "The user asked an RFQ-specific question but no grounded tool evidence "
-                    "is available."
-                ),
-                "Do not generate any RFQ-specific factual claims. Instead, respond honestly:",
-                "state that you cannot retrieve the requested information right now,",
-                "and suggest what you can help with or ask the user to rephrase.",
-                "Do not append any confidence marker line for this response mode.",
-            ]
+            return list(GROUNDING_GAP_CONFIDENCE_LINES)
 
         if any_pattern_based_tool_fired:
             return [
-                "Confidence behavior: pattern-based evidence mode.",
-                (
-                    "When composing the final answer, end with this exact final line: "
-                    f"{CONFIDENCE_PATTERN_MARKER}"
-                ),
+                line.format(confidence_pattern_marker=CONFIDENCE_PATTERN_MARKER)
+                for line in PATTERN_BASED_CONFIDENCE_TEMPLATE_LINES
             ]
 
-        return [
-            "Confidence behavior: deterministic evidence mode.",
-            "Do not append any confidence marker line.",
-        ]
+        return list(DETERMINISTIC_CONFIDENCE_LINES)
 
     @staticmethod
     def _build_variable_suffix(
