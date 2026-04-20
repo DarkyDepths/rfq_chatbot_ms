@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+import logging
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from src.config.settings import get_settings
+from src.utils.correlation import get_correlation_id
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
+from src.utils.metrics import record_upstream_error
+
+
+logger = logging.getLogger(__name__)
 
 
 class ManagerRfqDetail(BaseModel):
@@ -120,25 +126,37 @@ class ManagerConnector:
 
     def _get_json(self, path: str, *, not_found_message: str) -> dict:
         if self._client is None and not self._base_url:
+            record_upstream_error("manager", "not_configured")
             raise UpstreamServiceError("Manager service is not configured")
+
+        request_headers = {"X-Correlation-ID": get_correlation_id()}
 
         try:
             if self._client is not None:
-                response = self._client.get(path)
+                response = self._client.get(path, headers=request_headers)
             else:
                 with httpx.Client(
                     base_url=self._base_url,
                     timeout=self._timeout_seconds,
                 ) as client:
-                    response = client.get(path)
+                    response = client.get(path, headers=request_headers)
         except httpx.TimeoutException as exc:
+            record_upstream_error("manager", "timeout")
             raise UpstreamTimeoutError("Manager service request timed out") from exc
         except httpx.RequestError as exc:
+            record_upstream_error("manager", "request_error")
             raise UpstreamServiceError("Manager service request failed") from exc
 
         if response.status_code == 404:
             raise NotFoundError(not_found_message)
         if response.status_code >= 400:
+            record_upstream_error("manager", f"http_{response.status_code}")
+            logger.warning(
+                "manager_request_failed status_code=%s path=%s",
+                response.status_code,
+                path,
+                extra={"upstream_service": "manager", "status_code": response.status_code},
+            )
             raise UpstreamServiceError(
                 f"Manager service request failed with status {response.status_code}"
             )
@@ -146,6 +164,7 @@ class ManagerConnector:
         try:
             return response.json()
         except ValueError as exc:
+            record_upstream_error("manager", "invalid_json")
             raise UpstreamServiceError("Manager service returned invalid JSON") from exc
 
     @staticmethod
@@ -153,6 +172,7 @@ class ManagerConnector:
         try:
             return model.model_validate(payload)
         except ValidationError as exc:
+            record_upstream_error("manager", "payload_validation")
             raise UpstreamServiceError(message) from exc
 
     @staticmethod

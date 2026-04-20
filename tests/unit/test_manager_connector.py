@@ -5,14 +5,17 @@ import pytest
 
 from src.connectors.manager_connector import ManagerConnector
 from src.config.settings import get_settings
+from src.utils.correlation import correlation_id_context
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
 
 
 def test_manager_connector_parses_rfq_detail_response():
     rfq_id = uuid.uuid4()
+    token = correlation_id_context.set("corr-manager-1234")
 
     def handler(request):
         assert request.url.path.endswith(f"/rfqs/{rfq_id}")
+        assert request.headers["X-Correlation-ID"] == "corr-manager-1234"
         return httpx.Response(
             200,
             json={
@@ -43,7 +46,10 @@ def test_manager_connector_parses_rfq_detail_response():
     )
     connector = ManagerConnector(client=client)
 
-    result = connector.get_rfq(rfq_id)
+    try:
+        result = connector.get_rfq(rfq_id)
+    finally:
+        correlation_id_context.reset(token)
 
     assert result.id == rfq_id
     assert result.owner == "Sarah"

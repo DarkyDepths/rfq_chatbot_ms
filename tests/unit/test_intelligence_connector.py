@@ -5,14 +5,17 @@ import pytest
 
 from src.connectors.intelligence_connector import IntelligenceConnector
 from src.config.settings import get_settings
+from src.utils.correlation import correlation_id_context
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
 
 
 def test_intelligence_connector_parses_snapshot_response():
     rfq_id = uuid.uuid4()
+    token = correlation_id_context.set("corr-intel-1234")
 
     def handler(request):
         assert request.url.path.endswith(f"/rfqs/{rfq_id}/snapshot")
+        assert request.headers["X-Correlation-ID"] == "corr-intel-1234"
         return httpx.Response(
             200,
             json={
@@ -63,7 +66,10 @@ def test_intelligence_connector_parses_snapshot_response():
     )
     connector = IntelligenceConnector(client=client)
 
-    result = connector.get_snapshot(rfq_id)
+    try:
+        result = connector.get_snapshot(rfq_id)
+    finally:
+        correlation_id_context.reset(token)
 
     assert result.rfq_id == rfq_id
     assert result.content.rfq_summary.rfq_code == "IF-25144"

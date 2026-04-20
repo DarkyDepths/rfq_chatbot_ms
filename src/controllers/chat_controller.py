@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import time
 import uuid
 from types import SimpleNamespace
 
@@ -31,6 +32,13 @@ from src.translators.envelope_translator import (
 )
 from src.translators.chat_translator import to_turn_response
 from src.utils.errors import NotFoundError, UpstreamServiceError, UpstreamTimeoutError
+from src.utils.metrics import (
+    grounding_gaps_total,
+    record_intent,
+    record_tool_calls,
+    response_latency_seconds,
+    turns_total,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -76,94 +84,100 @@ class ChatController:
         session_id: uuid.UUID,
         command: TurnCreateCommand,
     ) -> TurnResponse:
-        session = self.session_datasource.get_by_id(session_id)
-        if not session:
-            raise NotFoundError(f"Session '{session_id}' not found")
+        started_at = time.perf_counter()
+        turns_total.inc()
+        try:
+            session = self.session_datasource.get_by_id(session_id)
+            if not session:
+                raise NotFoundError(f"Session '{session_id}' not found")
 
-        conversation = self.conversation_controller.get_or_create_conversation_for_session(
-            session.id
-        )
-
-        recent_messages = self.conversation_controller.get_recent_history(conversation.id, limit=1)
-        is_first_turn = len(recent_messages) == 0
-        last_assistant_content = self._extract_last_assistant_content(recent_messages)
-        last_resolved_intent = self._extract_last_resolved_intent(recent_messages)
-        preloaded_rfq_context = self._maybe_preload_rfq_context(
-            session=session,
-            is_first_turn=is_first_turn,
-        )
-
-        intent_result = self.intent_controller.classify_intent(
-            user_content=command.content,
-            session=session,
-            last_assistant_content=last_assistant_content,
-            last_resolved_intent=last_resolved_intent,
-        )
-        route = self._intent_to_route(intent_result.intent)
-        logger.info(
-            "phase6.intent_classified=%s",
-            intent_result.intent,
-            extra={"phase6.intent_classified": intent_result.intent},
-        )
-        logger.info(
-            "phase6.route_selected=%s",
-            route,
-            extra={"phase6.route_selected": route},
-        )
-        if intent_result.disambiguation_resolved:
-            logger.info(
-                "phase6.disambiguation_resolved=%s",
-                intent_result.resolved_rfq_reference,
-                extra={"phase6.disambiguation_resolved": intent_result.resolved_rfq_reference},
-            )
-        if intent_result.disambiguation_abandoned:
-            logger.info(
-                "phase6.disambiguation_abandoned=%s",
-                True,
-                extra={"phase6.disambiguation_abandoned": True},
+            conversation = self.conversation_controller.get_or_create_conversation_for_session(
+                session.id
             )
 
-        if intent_result.intent == "rfq_specific":
-            return self._handle_rfq_specific(
+            recent_messages = self.conversation_controller.get_recent_history(conversation.id, limit=1)
+            is_first_turn = len(recent_messages) == 0
+            last_assistant_content = self._extract_last_assistant_content(recent_messages)
+            last_resolved_intent = self._extract_last_resolved_intent(recent_messages)
+            preloaded_rfq_context = self._maybe_preload_rfq_context(
+                session=session,
+                is_first_turn=is_first_turn,
+            )
+
+            intent_result = self.intent_controller.classify_intent(
+                user_content=command.content,
+                session=session,
+                last_assistant_content=last_assistant_content,
+                last_resolved_intent=last_resolved_intent,
+            )
+            route = self._intent_to_route(intent_result.intent)
+            record_intent(intent_result.intent)
+            logger.info(
+                "phase6.intent_classified=%s",
+                intent_result.intent,
+                extra={"phase6.intent_classified": intent_result.intent},
+            )
+            logger.info(
+                "phase6.route_selected=%s",
+                route,
+                extra={"phase6.route_selected": route},
+            )
+            if intent_result.disambiguation_resolved:
+                logger.info(
+                    "phase6.disambiguation_resolved=%s",
+                    intent_result.resolved_rfq_reference,
+                    extra={"phase6.disambiguation_resolved": intent_result.resolved_rfq_reference},
+                )
+            if intent_result.disambiguation_abandoned:
+                logger.info(
+                    "phase6.disambiguation_abandoned=%s",
+                    True,
+                    extra={"phase6.disambiguation_abandoned": True},
+                )
+
+            if intent_result.intent == "rfq_specific":
+                return self._handle_rfq_specific(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    intent_result=intent_result,
+                    is_first_turn=is_first_turn,
+                    preloaded_rfq_context=preloaded_rfq_context,
+                )
+
+            if intent_result.intent == "general_knowledge":
+                return self._handle_general_knowledge(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    preloaded_rfq_context=preloaded_rfq_context,
+                )
+
+            if intent_result.intent == "unsupported":
+                return self._handle_unsupported(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    preloaded_rfq_context=preloaded_rfq_context,
+                )
+
+            if intent_result.intent == "disambiguation":
+                return self._handle_disambiguation(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    preloaded_rfq_context=preloaded_rfq_context,
+                )
+
+            return self._handle_conversational(
                 session=session,
                 conversation_id=conversation.id,
                 command=command,
-                intent_result=intent_result,
                 is_first_turn=is_first_turn,
                 preloaded_rfq_context=preloaded_rfq_context,
             )
-
-        if intent_result.intent == "general_knowledge":
-            return self._handle_general_knowledge(
-                session=session,
-                conversation_id=conversation.id,
-                command=command,
-                preloaded_rfq_context=preloaded_rfq_context,
-            )
-
-        if intent_result.intent == "unsupported":
-            return self._handle_unsupported(
-                session=session,
-                conversation_id=conversation.id,
-                command=command,
-                preloaded_rfq_context=preloaded_rfq_context,
-            )
-
-        if intent_result.intent == "disambiguation":
-            return self._handle_disambiguation(
-                session=session,
-                conversation_id=conversation.id,
-                command=command,
-                preloaded_rfq_context=preloaded_rfq_context,
-            )
-
-        return self._handle_conversational(
-            session=session,
-            conversation_id=conversation.id,
-            command=command,
-            is_first_turn=is_first_turn,
-            preloaded_rfq_context=preloaded_rfq_context,
-        )
+        finally:
+            response_latency_seconds.observe(time.perf_counter() - started_at)
 
     def _handle_rfq_specific(
         self,
@@ -237,6 +251,7 @@ class ChatController:
             extra={"phase6.grounding_satisfied": has_evidence},
         )
         if grounding_gap:
+            grounding_gaps_total.inc()
             if not tool_planner_fired:
                 logger.info(
                     "phase6.grounding_mismatch=%s",
@@ -423,6 +438,7 @@ class ChatController:
             extra={"phase5.confidence_marker_emitted": confidence_marker_emitted},
         )
         source_refs = collect_source_refs(all_tool_call_records)
+        record_tool_calls([record.tool_name for record in all_tool_call_records])
         if apply_output_guardrail and intent is not None:
             guardrail_result = self.output_guardrail.evaluate(
                 intent=intent,
