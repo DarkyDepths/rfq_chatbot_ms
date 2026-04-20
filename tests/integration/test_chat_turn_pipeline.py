@@ -248,6 +248,31 @@ def test_pipeline_rfq_profile_reuses_stage_fetch_with_single_manager_get_rfq_cal
         _clear_step6_dependencies(app)
 
 
+def test_pipeline_first_turn_stage_query_uses_one_manager_get_rfq_call_max(client, app):
+    fake_azure = FakeAzureOpenAIConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_step6_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+        response = client.post(
+            f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+            json={"content": "what is the current stage?"},
+        )
+
+        assert response.status_code == 200
+        assert manager.get_rfq_calls <= 1
+        assert manager.get_rfq_stages_calls == 1
+    finally:
+        _clear_step6_dependencies(app)
+
+
 def test_pipeline_capability_status_turn_skips_tool_retrieval_calls(client, app):
     fake_azure = FakeAzureOpenAIConnector()
     manager = CountingManagerConnector()

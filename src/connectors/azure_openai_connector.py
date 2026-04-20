@@ -11,6 +11,7 @@ from openai import APIError, APITimeoutError, AzureOpenAI
 from openai import RateLimitError as OpenAIRateLimitError
 
 from src.config.settings import get_settings
+from src.utils.correlation import get_correlation_id
 from src.utils.metrics import record_upstream_error
 from src.utils.errors import (
     RateLimitError,
@@ -66,6 +67,7 @@ class AzureOpenAIConnector:
                     "model": self._deployment_name,
                     "messages": messages,
                     "timeout": self._timeout_seconds,
+                    "extra_headers": {"X-Correlation-ID": get_correlation_id()},
                 }
                 if tools:
                     payload["tools"] = tools

@@ -8,6 +8,7 @@ from openai import RateLimitError as OpenAIRateLimitError
 
 from src.connectors.azure_openai_connector import AzureOpenAIConnector
 from src.config.settings import get_settings
+from src.utils.correlation import correlation_id_context
 from src.utils.errors import RateLimitError, UpstreamServiceError, UpstreamTimeoutError
 
 
@@ -34,6 +35,27 @@ def test_azure_openai_connector_returns_assistant_text():
     result = connector.create_chat_completion([{"role": "system", "content": "x"}])
 
     assert result.assistant_text == "Hello from Azure"
+
+
+def test_azure_openai_connector_propagates_correlation_id_header():
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Hello from Azure"))]
+    )
+    client = _build_mock_client(response)
+    connector = AzureOpenAIConnector(
+        client=client,
+        deployment_name="chat-deployment",
+        timeout_seconds=3.0,
+    )
+
+    token = correlation_id_context.set("corr-test-123")
+    try:
+        connector.create_chat_completion([{"role": "system", "content": "x"}])
+    finally:
+        correlation_id_context.reset(token)
+
+    sent_kwargs = client.chat.completions.create.call_args.kwargs
+    assert sent_kwargs["extra_headers"]["X-Correlation-ID"] == "corr-test-123"
 
 
 def test_azure_openai_connector_maps_timeout():
