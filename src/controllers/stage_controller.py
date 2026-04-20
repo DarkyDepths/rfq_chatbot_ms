@@ -29,7 +29,11 @@ class StageController:
     def __init__(self, manager_connector: ManagerConnector):
         self.manager_connector = manager_connector
 
-    def resolve_stage(self, session: ChatbotSession) -> StageResolution:
+    def resolve_stage(
+        self,
+        session: ChatbotSession,
+        preloaded_rfq_detail: ManagerRfqDetail | None = None,
+    ) -> StageResolution:
         """Resolve stage profile with graceful degradation on upstream failures."""
 
         if session.mode != SessionMode.RFQ_BOUND:
@@ -39,14 +43,17 @@ class StageController:
         if rfq_id is None:
             return self._default_resolution("invalid_rfq_id_format")
 
-        try:
-            rfq_detail = self.manager_connector.get_rfq(rfq_id)
-        except UpstreamTimeoutError:
-            return self._default_resolution("upstream_timeout")
-        except UpstreamServiceError:
-            return self._default_resolution("upstream_service_error")
-        except NotFoundError:
-            return self._default_resolution("rfq_not_found")
+        if preloaded_rfq_detail is not None:
+            rfq_detail = preloaded_rfq_detail
+        else:
+            try:
+                rfq_detail = self.manager_connector.get_rfq(rfq_id)
+            except UpstreamTimeoutError:
+                return self._default_resolution("upstream_timeout")
+            except UpstreamServiceError:
+                return self._default_resolution("upstream_service_error")
+            except NotFoundError:
+                return self._default_resolution("rfq_not_found")
 
         stage_id = rfq_detail.current_stage_id
         if stage_id in STAGE_PROFILES:

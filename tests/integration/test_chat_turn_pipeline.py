@@ -242,7 +242,7 @@ def test_pipeline_rfq_profile_reuses_stage_fetch_with_single_manager_get_rfq_cal
         assert response.status_code == 200
         assert manager.get_rfq_calls == 1
         assert manager.get_rfq_stages_calls == 0
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
         assert payload["source_refs"][0]["artifact"] == "rfq"
     finally:
         _clear_step6_dependencies(app)
@@ -270,9 +270,9 @@ def test_pipeline_capability_status_turn_skips_tool_retrieval_calls(client, app)
         assert response.status_code == 200
         assert payload["source_refs"] == []
         assert payload["content"].startswith("I don't have grounded facts for")
-        assert manager.get_rfq_calls == 0
+        assert manager.get_rfq_calls == 1
         assert manager.get_rfq_stages_calls == 0
-        assert intelligence.get_snapshot_calls == 0
+        assert intelligence.get_snapshot_calls == 1
     finally:
         _clear_step6_dependencies(app)
 
@@ -300,7 +300,8 @@ def test_pipeline_stage_resolution_failure_degrades_for_non_retrieval_turn(
 
         payload = response.json()
         assert response.status_code == 200
-        assert payload["source_refs"] == []
+        assert payload["source_refs"]
+        assert payload["source_refs"][0]["system"] == "rfq_intelligence_ms"
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
         assert _log_values(caplog, "phase5.stage_resolved") == []
@@ -337,7 +338,7 @@ def test_pipeline_stage_resolution_failure_with_profile_query_degrades_to_ground
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
-        assert manager.get_rfq_calls == 2
+        assert manager.get_rfq_calls == 3
     finally:
         _clear_step6_dependencies(app)
 

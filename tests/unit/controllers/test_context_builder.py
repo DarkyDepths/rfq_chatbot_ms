@@ -291,3 +291,40 @@ def test_without_disambiguation_context_behavior_is_unchanged():
 
     assert "Disambiguation behavior: RFQ resolution mode." not in prompt.stable_prefix
     assert "Retrieved facts:" in prompt.variable_suffix
+
+
+def test_turn_guidance_lines_are_rendered_as_xml_section_when_provided():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="hello")],
+        latest_user_turn="hello",
+        turn_guidance_lines=["Line one", "Line two"],
+    )
+
+    assert "<turn_guidance>" in prompt.stable_prefix
+    assert "Line one" in prompt.stable_prefix
+    assert "Line two" in prompt.stable_prefix
+    assert "</turn_guidance>" in prompt.stable_prefix
+
+
+def test_variable_suffix_can_omit_history_for_structured_message_mode():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [
+            SimpleNamespace(role="user", content="Hello"),
+            SimpleNamespace(role="assistant", content="Hi there"),
+        ],
+        supplemental_context_blocks=["Tool: get_rfq_profile"],
+        retrieval_context_blocks=["Tool: get_rfq_snapshot"],
+        latest_user_turn="What's next?",
+        include_history_in_variable_suffix=False,
+    )
+
+    assert "Conversation history:" not in prompt.variable_suffix
+    assert "assistant:" not in prompt.variable_suffix
+    assert "Session context:" in prompt.variable_suffix
+    assert "Retrieved facts:" in prompt.variable_suffix
+    assert "Latest user turn:" in prompt.variable_suffix
+    assert "What's next?" in prompt.variable_suffix

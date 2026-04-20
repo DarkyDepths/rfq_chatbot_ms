@@ -159,7 +159,9 @@ def test_chat_controller_handles_turn_with_real_persistence(db_session):
     assert response.content == "Phase 3 assistant response"
     assert [message.role for message in messages] == ["user", "assistant"]
     assert fake_connector.calls[0]["messages"][0]["role"] == "system"
-    assert "user: What is PWHT?" in fake_connector.calls[0]["messages"][1]["content"]
+    assert fake_connector.calls[0]["messages"][-1]["role"] == "user"
+    assert "Latest user turn:" in fake_connector.calls[0]["messages"][-1]["content"]
+    assert "What is PWHT?" in fake_connector.calls[0]["messages"][-1]["content"]
 
 
 def test_chat_controller_persists_tool_calls_and_source_refs_for_retrieval_turn(
@@ -190,4 +192,4 @@ def test_chat_controller_persists_tool_calls_and_source_refs_for_retrieval_turn(
     assert response.source_refs[0].system == "rfq_manager_ms"
     assert assistant_message.tool_calls[0]["tool_name"] == "get_rfq_profile"
     assert assistant_message.source_refs[0]["artifact"] == "rfq"
-    assert "Tool: get_rfq_profile" in fake_connector.calls[0]["messages"][1]["content"]
+    assert "Tool: get_rfq_profile" in fake_connector.calls[0]["messages"][-1]["content"]
