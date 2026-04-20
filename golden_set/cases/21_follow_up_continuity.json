@@ -1,0 +1,31 @@
+{
+  "id": "follow_up_continuity",
+  "description": "Short follow-up cue keeps rfq_specific continuity after an rfq_specific prior turn.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What's the deadline?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_profile"],
+        "source_refs_present": true,
+        "required_patterns": ["deadline is 2026-05-01"]
+      }
+    },
+    {
+      "user_content": "and this one?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "source_refs_present": false,
+        "required_patterns": ["cannot retrieve the requested information"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

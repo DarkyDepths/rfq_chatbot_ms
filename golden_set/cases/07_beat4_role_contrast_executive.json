@@ -1,0 +1,23 @@
+{
+  "id": "beat4_role_contrast_executive",
+  "description": "Defense beat 4 (executive role): role framing produces executive summary answer.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "executive"
+  },
+  "turns": [
+    {
+      "user_content": "What's the margin and deadline for this RFQ?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_profile"],
+        "source_refs_present": true,
+        "required_patterns": ["executive margin summary"],
+        "forbidden_patterns": ["working-level margin detail"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

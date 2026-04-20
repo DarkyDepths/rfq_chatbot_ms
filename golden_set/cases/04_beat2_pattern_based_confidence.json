@@ -1,0 +1,22 @@
+{
+  "id": "beat2_pattern_based_confidence",
+  "description": "Defense beat 2: pattern-based response includes confidence marker.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "Give me the current snapshot for this RFQ and is this an Aramco pressure vessel project?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["get_rfq_snapshot"],
+        "source_refs_present": true,
+        "required_patterns": ["aramco pressure vessel", "confidence:\\s*pattern-based"],
+        "confidence_marker": "present"
+      }
+    }
+  ]
+}

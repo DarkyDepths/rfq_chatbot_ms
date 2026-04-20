@@ -1,0 +1,27 @@
+{
+  "id": "disambiguation_abandonment",
+  "description": "Disambiguation can be abandoned by switching to general knowledge.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What's the status of this RFQ?",
+      "expect": {
+        "intent": "disambiguation",
+        "route": "disambiguation"
+      }
+    },
+    {
+      "user_content": "Never mind, what is PWHT?",
+      "expect": {
+        "intent": "general_knowledge",
+        "route": "direct_llm",
+        "disambiguation_abandoned": true,
+        "source_refs_present": false,
+        "required_patterns": ["post-weld heat treatment"]
+      }
+    }
+  ]
+}

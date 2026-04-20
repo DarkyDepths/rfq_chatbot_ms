@@ -1,0 +1,20 @@
+{
+  "id": "intent_conversational_boundary",
+  "description": "Non-domain small-talk remains conversational fallback.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "How are you today?",
+      "expect": {
+        "intent": "conversational",
+        "route": "conversational",
+        "tools_exclude": ["get_rfq_profile", "get_rfq_stage", "get_rfq_snapshot", "get_capability_status"],
+        "source_refs_present": false,
+        "required_patterns": ["assistant-response"]
+      }
+    }
+  ]
+}

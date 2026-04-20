@@ -443,7 +443,7 @@ def test_phase5_scenario_6_graceful_degradation_on_stage_resolution_failure(
         with caplog.at_level(logging.INFO):
             response = client.post(
                 f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-                json={"content": "Hello copilot"},
+                json={"content": "what's the deadline?"},
             )
 
         assert response.status_code == 200

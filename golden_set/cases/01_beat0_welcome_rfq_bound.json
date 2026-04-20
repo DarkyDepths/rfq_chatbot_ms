@@ -1,0 +1,27 @@
+{
+  "id": "beat0_welcome_rfq_bound",
+  "description": "RFQ-bound first-turn greeting uses contextual welcome behavior.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "known_stage",
+    "intelligence_mode": "ok"
+  },
+  "turns": [
+    {
+      "user_content": "Hello copilot",
+      "expect": {
+        "intent": "conversational",
+        "route": "conversational",
+        "tools_include": ["get_rfq_profile", "get_rfq_snapshot"],
+        "source_refs_present": true,
+        "required_patterns": ["welcome", "boiler upgrade", "acme industrial", "go\\s*/\\s*no-go"],
+        "confidence_marker": "absent",
+        "stable_prefix_required": ["first-turn conversational greeting in RFQ-bound mode"]
+      }
+    }
+  ]
+}

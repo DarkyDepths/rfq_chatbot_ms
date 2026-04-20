@@ -1,0 +1,20 @@
+{
+  "id": "capability_status_historical_comparison",
+  "description": "Capability-status path handles historical-comparison requests with named condition.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "Can you do historical comparison for similar RFQs?",
+      "expect": {
+        "intent": "unsupported",
+        "route": "capability_status",
+        "tools_include": ["get_capability_status"],
+        "required_patterns": ["Historical RFQ comparison benchmarking", "outcomes are recorded across multiple comparable RFQs"],
+        "source_refs_present": false
+      }
+    }
+  ]
+}

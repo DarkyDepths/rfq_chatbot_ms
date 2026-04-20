@@ -1,0 +1,21 @@
+{
+  "id": "grounding_gap_no_tool_match",
+  "description": "RFQ-specific turn with no retrieval keyword triggers grounding-gap response.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "Tell me about this RFQ.",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "source_refs_present": true,
+        "required_patterns": ["cannot retrieve the requested information"],
+        "confidence_marker": "absent"
+      }
+    }
+  ]
+}

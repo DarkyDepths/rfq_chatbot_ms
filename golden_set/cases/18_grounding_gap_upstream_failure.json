@@ -1,0 +1,25 @@
+{
+  "id": "grounding_gap_upstream_failure",
+  "description": "Upstream retrieval failure produces grounding-gap response without provenance.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "upstream_failure",
+    "intelligence_mode": "failure"
+  },
+  "turns": [
+    {
+      "user_content": "What's the deadline?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "tools_include": ["retrieval_unavailable"],
+        "source_refs_present": false,
+        "required_patterns": ["cannot retrieve the requested information"]
+      }
+    }
+  ]
+}

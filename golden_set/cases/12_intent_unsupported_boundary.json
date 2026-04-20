@@ -1,0 +1,20 @@
+{
+  "id": "intent_unsupported_boundary",
+  "description": "Unsupported analytics question routes to capability-status absence path.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "Show me portfolio analytics.",
+      "expect": {
+        "intent": "unsupported",
+        "route": "capability_status",
+        "tools_include": ["get_capability_status"],
+        "source_refs_present": false,
+        "required_patterns": ["Portfolio analytics retrieval", "available after portfolio analytics support is enabled"]
+      }
+    }
+  ]
+}

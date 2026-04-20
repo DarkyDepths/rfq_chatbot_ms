@@ -1,0 +1,22 @@
+{
+  "id": "knowledge_boundary_general_rt",
+  "description": "Knowledge-boundary behavior answers general RT question without claiming RFQ facts.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "In general, how does RT work?",
+      "expect": {
+        "intent": "general_knowledge",
+        "route": "direct_llm",
+        "tools_exclude": ["get_capability_status"],
+        "source_refs_present": false,
+        "required_patterns": ["radiographic testing"],
+        "forbidden_patterns": ["cannot retrieve"]
+      }
+    }
+  ]
+}

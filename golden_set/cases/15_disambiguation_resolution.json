@@ -1,0 +1,28 @@
+{
+  "id": "disambiguation_resolution",
+  "description": "Disambiguation follow-up with RFQ reference resolves to rfq_specific path.",
+  "session": {
+    "mode": "global",
+    "role": "estimation_dept_lead"
+  },
+  "turns": [
+    {
+      "user_content": "What's the status of this RFQ?",
+      "expect": {
+        "intent": "disambiguation",
+        "route": "disambiguation",
+        "required_patterns": ["which rfq are you referring to"]
+      }
+    },
+    {
+      "user_content": "IF-25144",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "disambiguation_resolved": true,
+        "source_refs_present": false,
+        "required_patterns": ["cannot retrieve the requested information"]
+      }
+    }
+  ]
+}
