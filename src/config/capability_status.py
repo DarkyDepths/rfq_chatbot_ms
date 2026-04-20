@@ -51,4 +51,28 @@ CAPABILITY_STATUS_ENTRIES: dict[str, CapabilityStatus] = {
         "capability_name": "Estimation amount retrieval",
         "named_future_condition": "available after estimation-field extraction support is enabled",
     },
+    "historical comparison": {
+        "capability_name": "Historical RFQ comparison benchmarking",
+        "named_future_condition": (
+            "available after outcomes are recorded across multiple comparable RFQs"
+        ),
+    },
+    "similar rfq": {
+        "capability_name": "Similar RFQ retrieval",
+        "named_future_condition": (
+            "available after similarity indexing is enabled over a larger RFQ corpus"
+        ),
+    },
+    "supplier recommendation": {
+        "capability_name": "Supplier recommendation support",
+        "named_future_condition": (
+            "available after supplier performance history is integrated and validated"
+        ),
+    },
+    "material pricing": {
+        "capability_name": "Material pricing intelligence",
+        "named_future_condition": (
+            "available after material pricing feeds are integrated and quality-checked"
+        ),
+    },
 }
