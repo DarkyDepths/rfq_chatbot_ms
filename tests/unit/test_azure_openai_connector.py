@@ -161,3 +161,34 @@ def test_azure_openai_connector_builds_azure_client_from_settings(monkeypatch):
         "max_retries": 0,
     }
     get_settings.cache_clear()
+
+
+def test_azure_openai_connector_assert_ready_passes_when_configured(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example-resource.openai.azure.com/")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5-nano")
+    get_settings.cache_clear()
+
+    try:
+        connector = AzureOpenAIConnector()
+        connector.assert_ready()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_azure_openai_connector_assert_ready_fails_without_required_config(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "")
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "")
+    get_settings.cache_clear()
+
+    try:
+        connector = AzureOpenAIConnector()
+        with pytest.raises(UpstreamServiceError) as exc:
+            connector.assert_ready()
+    finally:
+        get_settings.cache_clear()
+
+    assert str(exc.value) == "Azure OpenAI is not configured for chat completions"
