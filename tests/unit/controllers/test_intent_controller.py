@@ -44,7 +44,7 @@ def test_disambiguation_does_not_fire_for_same_reference_in_rfq_bound_session():
     assert result.intent == "rfq_specific"
 
 
-def test_what_is_pwht_in_portfolio_session_is_general_knowledge():
+def test_what_is_pwht_in_portfolio_session_is_domain_knowledge():
     controller = IntentController()
 
     result = controller.classify_intent(
@@ -53,10 +53,10 @@ def test_what_is_pwht_in_portfolio_session_is_general_knowledge():
         last_assistant_content=None,
     )
 
-    assert result.intent == "general_knowledge"
+    assert result.intent == "domain_knowledge"
 
 
-def test_what_is_pwht_in_rfq_bound_session_is_general_knowledge():
+def test_what_is_pwht_in_rfq_bound_session_is_domain_knowledge():
     controller = IntentController()
 
     result = controller.classify_intent(
@@ -65,7 +65,7 @@ def test_what_is_pwht_in_rfq_bound_session_is_general_knowledge():
         last_assistant_content=None,
     )
 
-    assert result.intent == "general_knowledge"
+    assert result.intent == "domain_knowledge"
 
 
 def test_deadline_question_in_rfq_bound_session_is_rfq_specific():
@@ -149,7 +149,7 @@ def test_disambiguation_resolution_short_rfq_selector_reclassifies_to_rfq_specif
     assert result.disambiguation_abandoned is False
 
 
-def test_disambiguation_resolution_can_be_abandoned_with_general_knowledge_follow_up():
+def test_disambiguation_resolution_can_be_abandoned_with_domain_knowledge_follow_up():
     controller = IntentController()
 
     result = controller.classify_intent(
@@ -158,7 +158,7 @@ def test_disambiguation_resolution_can_be_abandoned_with_general_knowledge_follo
         last_assistant_content="Which RFQ are you referring to?",
     )
 
-    assert result.intent == "general_knowledge"
+    assert result.intent == "domain_knowledge"
     assert result.disambiguation_resolved is False
     assert result.resolved_rfq_reference is None
     assert result.disambiguation_abandoned is True
@@ -188,7 +188,7 @@ def test_without_disambiguation_prompt_uses_normal_classification_and_flags_fals
         last_assistant_content="Sure, let's continue.",
     )
 
-    assert result.intent == "general_knowledge"
+    assert result.intent == "domain_knowledge"
     assert result.disambiguation_resolved is False
     assert result.resolved_rfq_reference is None
     assert result.disambiguation_abandoned is False
@@ -231,7 +231,7 @@ def test_short_ambiguous_follow_up_uses_rfq_specific_continuity_tiebreaker():
     assert result.intent == "rfq_specific"
 
 
-def test_clear_general_knowledge_signal_overrides_rfq_continuity_tiebreaker():
+def test_clear_domain_knowledge_signal_overrides_rfq_continuity_tiebreaker():
     controller = IntentController()
 
     result = controller.classify_intent(
@@ -241,4 +241,127 @@ def test_clear_general_knowledge_signal_overrides_rfq_continuity_tiebreaker():
         last_resolved_intent="rfq_specific",
     )
 
-    assert result.intent == "general_knowledge"
+    assert result.intent == "domain_knowledge"
+
+
+# ──────────────────────────────────────────────
+# Phase 6.5: Domain boundary tests
+# ──────────────────────────────────────────────
+
+def test_bread_question_is_out_of_scope():
+    """'how to prepare bread at home' matches explanatory patterns but no domain terms → out_of_scope."""
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="how to prepare bread at home",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "out_of_scope"
+
+
+def test_weather_is_out_of_scope():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="what is the weather today?",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "out_of_scope"
+
+
+def test_purchase_order_is_domain_knowledge():
+    """'what is a purchase order?' contains tier 2 term → domain_knowledge."""
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="what is a purchase order?",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "domain_knowledge"
+
+
+def test_asme_is_domain_knowledge():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="explain ASME Section VIII",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "domain_knowledge"
+
+
+# ──────────────────────────────────────────────
+# Phase 6.5: Conversational sub-type tests
+# ──────────────────────────────────────────────
+
+def test_hello_has_greeting_subtype():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="hello",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "conversational"
+    assert result.conversational_subtype == "greeting"
+
+
+def test_who_are_you_has_identity_subtype():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="who are you?",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "conversational"
+    assert result.conversational_subtype == "identity"
+
+
+def test_thanks_has_thanks_subtype():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="thanks!",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "conversational"
+    assert result.conversational_subtype == "thanks"
+
+
+def test_goodbye_has_goodbye_subtype():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="goodbye",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "conversational"
+    assert result.conversational_subtype == "goodbye"
+
+
+def test_never_mind_has_reset_subtype():
+    controller = IntentController()
+
+    result = controller.classify_intent(
+        user_content="never mind",
+        session=_session(SessionMode.RFQ_BOUND),
+        last_assistant_content=None,
+    )
+
+    assert result.intent == "conversational"
+    assert result.conversational_subtype == "reset"

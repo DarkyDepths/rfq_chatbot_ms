@@ -49,6 +49,7 @@ def test_context_builder_returns_prompt_envelope_with_frozen_public_fields():
         "domain_constraints",
         "domain_vocabulary",
         "response_rules",
+        "greeting_behavior",
         "role_framing",
         "stage_framing",
         "confidence_behavior",
@@ -306,6 +307,32 @@ def test_turn_guidance_lines_are_rendered_as_xml_section_when_provided():
     assert "Line one" in prompt.stable_prefix
     assert "Line two" in prompt.stable_prefix
     assert "</turn_guidance>" in prompt.stable_prefix
+
+
+def test_greeting_mode_injects_turn_mode_section():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="hello")],
+        latest_user_turn="hello",
+        greeting_mode=True,
+    )
+
+    assert "<turn_mode>" in prompt.stable_prefix
+    assert "greeting" in prompt.stable_prefix
+    assert "</turn_mode>" in prompt.stable_prefix
+
+
+def test_non_greeting_mode_omits_turn_mode_section():
+    builder = ContextBuilder()
+
+    prompt = builder.build(
+        [SimpleNamespace(role="user", content="hello")],
+        latest_user_turn="hello",
+        greeting_mode=False,
+    )
+
+    assert "<turn_mode>" not in prompt.stable_prefix
 
 
 def test_variable_suffix_can_omit_history_for_structured_message_mode():

@@ -190,7 +190,7 @@ def test_route_rfq_specific_uses_tools_pipeline(client, app, caplog):
         _clear_dependencies(app)
 
 
-def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(client, app, caplog):
+def test_route_domain_knowledge_on_rfq_bound_uses_direct_llm_without_tools(client, app, caplog):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
@@ -211,7 +211,7 @@ def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(clie
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert _log_values(caplog, "phase6.grounding_satisfied") == []
@@ -370,7 +370,7 @@ def test_route_conversational_in_any_session(client, app, caplog):
         _clear_dependencies(app)
 
 
-def test_route_general_knowledge_on_portfolio_session_uses_direct_llm(client, app, caplog):
+def test_route_domain_knowledge_on_portfolio_session_uses_direct_llm(client, app, caplog):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
@@ -391,7 +391,7 @@ def test_route_general_knowledge_on_portfolio_session_uses_direct_llm(client, ap
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0

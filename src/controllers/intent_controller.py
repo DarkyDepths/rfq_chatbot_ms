@@ -10,7 +10,13 @@ from src.config.disambiguation_config import (
     MAX_RESOLUTION_WORD_COUNT,
     RFQ_REFERENCE_PATTERNS,
 )
-from src.config.intent_patterns import FALLBACK_INTENT, INTENT_PATTERNS
+from src.config.intent_patterns import (
+    FALLBACK_INTENT,
+    INTENT_PATTERNS,
+    classify_conversational_subtype,
+    message_contains_off_domain_indicator,
+    message_contains_domain_term,
+)
 from src.models.session import ChatbotSession, SessionMode
 
 
@@ -22,6 +28,7 @@ class IntentClassification:
     disambiguation_resolved: bool
     resolved_rfq_reference: str | None
     disambiguation_abandoned: bool
+    conversational_subtype: str | None = None
 
 
 class IntentController:
@@ -49,7 +56,7 @@ class IntentController:
         last_assistant_content: str | None,
         last_resolved_intent: str | None = None,
     ) -> IntentClassification:
-        """Classify one user turn into the frozen 5-intent taxonomy."""
+        """Classify one user turn into the frozen intent taxonomy."""
 
         normalized_content = self._normalize(user_content)
 
@@ -68,23 +75,31 @@ class IntentController:
                     normalized_content=normalized_content,
                     session=session,
                 )
-                abandoned = classified_intent in {"conversational", "general_knowledge"}
+                abandoned = classified_intent in {"conversational", "domain_knowledge"}
+                subtype = None
+                if classified_intent == "conversational":
+                    subtype = classify_conversational_subtype(user_content)
                 return IntentClassification(
                     intent=classified_intent,
                     disambiguation_resolved=False,
                     resolved_rfq_reference=None,
                     disambiguation_abandoned=abandoned,
+                    conversational_subtype=subtype,
                 )
 
             classified_intent = self._classify_normal(
                 normalized_content=normalized_content,
                 session=session,
             )
+            subtype = None
+            if classified_intent == "conversational":
+                subtype = classify_conversational_subtype(user_content)
             return IntentClassification(
                 intent=classified_intent,
                 disambiguation_resolved=False,
                 resolved_rfq_reference=None,
                 disambiguation_abandoned=True,
+                conversational_subtype=subtype,
             )
 
         classified_intent = self._classify_normal(
@@ -92,11 +107,15 @@ class IntentController:
             session=session,
             last_resolved_intent=last_resolved_intent,
         )
+        subtype = None
+        if classified_intent == "conversational":
+            subtype = classify_conversational_subtype(user_content)
         return IntentClassification(
             intent=classified_intent,
             disambiguation_resolved=False,
             resolved_rfq_reference=None,
             disambiguation_abandoned=False,
+            conversational_subtype=subtype,
         )
 
     def _classify_normal(
@@ -129,9 +148,17 @@ class IntentController:
         if self._matches_intent(
             normalized_content=normalized_content,
             session=session,
-            intent="general_knowledge",
+            intent="domain_knowledge",
         ):
-            return "general_knowledge"
+            # Domain gate: check if the message actually contains domain vocabulary
+            if message_contains_domain_term(normalized_content):
+                return "domain_knowledge"
+            else:
+                # Explanatory question but no domain vocabulary → out of scope
+                return "out_of_scope"
+
+        if message_contains_off_domain_indicator(normalized_content):
+            return "out_of_scope"
 
         if self._should_apply_rfq_continuity_tiebreaker(
             normalized_content=normalized_content,

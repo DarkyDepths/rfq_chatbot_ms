@@ -165,7 +165,7 @@ def test_observability_rfq_specific_emits_phase5_and_phase6_fields(client, app, 
         _clear_dependencies(app)
 
 
-def test_observability_general_knowledge_has_no_stage_tool_or_grounding_fields(client, app, caplog):
+def test_observability_domain_knowledge_has_no_stage_tool_or_grounding_fields(client, app, caplog):
     fake_azure = ObservabilityAzureConnector()
     manager = ObservabilityManagerConnector()
     intelligence = ObservabilityIntelligenceConnector()
@@ -186,7 +186,7 @@ def test_observability_general_knowledge_has_no_stage_tool_or_grounding_fields(c
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert _log_values(caplog, "phase5.stage_resolved") == []
         assert _log_values(caplog, "phase5.tools_keyword_matched") == []

@@ -62,3 +62,11 @@ def test_smoke_route_returns_expected_payload(client):
         "service": "rfq_chatbot_ms",
         "phase": "phase-6",
     }
+
+
+def test_test_console_route_serves_html(client):
+    response = client.get("/rfq-chatbot/v1/test-console")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "RFQ Copilot Console" in response.text

@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 from src.connectors.azure_openai_connector import AzureOpenAIConnector
 from src.connectors.manager_connector import ManagerRfqDetail
+from src.config.intent_patterns import get_out_of_scope_refusal
 from src.controllers.context_builder import CONFIDENCE_PATTERN_MARKER, ContextBuilder
 from src.controllers.conversation_controller import ConversationController
 from src.controllers.disambiguation_controller import DisambiguationController
@@ -135,6 +136,15 @@ class ChatController:
                     extra={"phase6.disambiguation_abandoned": True},
                 )
 
+            # out_of_scope: deterministic refusal, no LLM call
+            if intent_result.intent == "out_of_scope":
+                return self._handle_out_of_scope(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    intent_result=intent_result,
+                )
+
             if intent_result.intent == "rfq_specific":
                 return self._handle_rfq_specific(
                     session=session,
@@ -145,11 +155,12 @@ class ChatController:
                     preloaded_rfq_context=preloaded_rfq_context,
                 )
 
-            if intent_result.intent == "general_knowledge":
-                return self._handle_general_knowledge(
+            if intent_result.intent == "domain_knowledge":
+                return self._handle_domain_knowledge(
                     session=session,
                     conversation_id=conversation.id,
                     command=command,
+                    intent_result=intent_result,
                     preloaded_rfq_context=preloaded_rfq_context,
                 )
 
@@ -173,11 +184,43 @@ class ChatController:
                 session=session,
                 conversation_id=conversation.id,
                 command=command,
+                intent_result=intent_result,
                 is_first_turn=is_first_turn,
                 preloaded_rfq_context=preloaded_rfq_context,
             )
         finally:
             response_latency_seconds.observe(time.perf_counter() - started_at)
+
+    def _handle_out_of_scope(
+        self,
+        *,
+        session,
+        conversation_id: uuid.UUID,
+        command: TurnCreateCommand,
+        intent_result: IntentClassification,
+    ) -> TurnResponse:
+        """Handle out-of-scope questions with deterministic refusal.
+        No LLM call. No context building. No tools.
+        """
+        refusal_text = get_out_of_scope_refusal()
+
+        logger.info(
+            "phase6_5.out_of_scope_refusal",
+            extra={
+                "intent": "out_of_scope",
+                "user_message_preview": command.content[:50],
+            },
+        )
+
+        # Persist as a regular turn
+        self.conversation_controller.create_user_message(conversation_id, command.content)
+        assistant_message = self.conversation_controller.create_assistant_message(
+            conversation_id,
+            refusal_text,
+            tool_calls=[],
+            source_refs=[],
+        )
+        return to_turn_response(conversation_id, assistant_message)
 
     def _handle_rfq_specific(
         self,
@@ -213,6 +256,8 @@ class ChatController:
                 tool_call_records=[],
                 supplemental_tool_call_records=preloaded_rfq_context.tool_call_records,
                 turn_guidance_lines=turn_guidance_lines,
+                intent="conversational",
+                conversational_subtype="greeting",
             )
 
         try:
@@ -276,12 +321,13 @@ class ChatController:
             apply_output_guardrail=True,
         )
 
-    def _handle_general_knowledge(
+    def _handle_domain_knowledge(
         self,
         *,
         session,
         conversation_id: uuid.UUID,
         command: TurnCreateCommand,
+        intent_result: IntentClassification,
         preloaded_rfq_context: PreloadedRfqContext,
     ) -> TurnResponse:
         role_resolution = self.role_controller.resolve_role(session)
@@ -293,6 +339,9 @@ class ChatController:
             stage_resolution=None,
             role_resolution=role_resolution,
             tool_call_records=[],
+            intent="domain_knowledge",
+            apply_output_guardrail=True,
+            conversational_subtype=None,
         )
 
     def _handle_unsupported(
@@ -359,19 +408,52 @@ class ChatController:
         session,
         conversation_id: uuid.UUID,
         command: TurnCreateCommand,
+        intent_result: IntentClassification,
         is_first_turn: bool,
         preloaded_rfq_context: PreloadedRfqContext,
     ) -> TurnResponse:
-        turn_guidance_lines = None
-        if is_first_turn and self._is_greeting_turn(command.content):
-            turn_guidance_lines = self._build_welcome_guidance_lines(
+        subtype = intent_result.conversational_subtype or "generic"
+
+        if subtype == "greeting":
+            return self._handle_greeting(
                 session=session,
-                stage_resolution=None,
+                conversation_id=conversation_id,
+                command=command,
+                intent_result=intent_result,
+                is_first_turn=is_first_turn,
                 preloaded_rfq_context=preloaded_rfq_context,
             )
-            supplemental_tool_call_records = preloaded_rfq_context.tool_call_records
-        else:
-            supplemental_tool_call_records = []
+
+        # All other conversational sub-types: generate with reduced context
+        turn_guidance_lines = None
+        return self._generate_and_persist_turn(
+            conversation_id=conversation_id,
+            latest_user_turn=command.content,
+            stage_resolution=None,
+            role_resolution=None,
+            tool_call_records=[],
+            turn_guidance_lines=turn_guidance_lines,
+            intent="conversational",
+            conversational_subtype=subtype,
+        )
+
+    def _handle_greeting(
+        self,
+        *,
+        session,
+        conversation_id: uuid.UUID,
+        command: TurnCreateCommand,
+        intent_result: IntentClassification,
+        is_first_turn: bool,
+        preloaded_rfq_context: PreloadedRfqContext,
+    ) -> TurnResponse:
+        """Handle first-turn greetings with minimal context."""
+        turn_guidance_lines = self._build_welcome_guidance_lines(
+            session=session,
+            stage_resolution=None,
+            preloaded_rfq_context=preloaded_rfq_context,
+        )
+        supplemental_tool_call_records = preloaded_rfq_context.tool_call_records if is_first_turn else []
 
         return self._generate_and_persist_turn(
             conversation_id=conversation_id,
@@ -381,6 +463,9 @@ class ChatController:
             tool_call_records=[],
             supplemental_tool_call_records=supplemental_tool_call_records,
             turn_guidance_lines=turn_guidance_lines,
+            greeting_mode=True,
+            intent="conversational",
+            conversational_subtype="greeting",
         )
 
     def _generate_and_persist_turn(
@@ -395,8 +480,10 @@ class ChatController:
         grounding_gap: bool = False,
         disambiguation_context: dict | None = None,
         turn_guidance_lines: list[str] | None = None,
+        greeting_mode: bool = False,
         intent: str | None = None,
         apply_output_guardrail: bool = False,
+        conversational_subtype: str | None = None,
     ) -> TurnResponse:
 
         supplemental_tool_call_records = supplemental_tool_call_records or []
@@ -427,7 +514,10 @@ class ChatController:
             grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
             turn_guidance_lines=turn_guidance_lines,
+            greeting_mode=greeting_mode,
             include_history_in_variable_suffix=False,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
         )
         azure_messages = self._build_azure_messages(prompt_envelope, recent_messages)
         completion = self.azure_openai_connector.create_chat_completion(azure_messages)
@@ -439,22 +529,35 @@ class ChatController:
         )
         source_refs = collect_source_refs(all_tool_call_records)
         record_tool_calls([record.tool_name for record in all_tool_call_records])
+
+        assistant_text = completion.assistant_text
+
         if apply_output_guardrail and intent is not None:
             guardrail_result = self.output_guardrail.evaluate(
                 intent=intent,
-                assistant_text=completion.assistant_text,
+                assistant_text=assistant_text,
                 source_refs=source_refs,
                 grounding_gap_injected=grounding_gap,
                 capability_status_hit=capability_status_hit,
+                conversational_subtype=conversational_subtype,
             )
             logger.info(
                 "phase6.output_guardrail_result=%s",
                 guardrail_result,
                 extra={"phase6.output_guardrail_result": guardrail_result},
             )
+
+            # Replace response on domain leak
+            if guardrail_result == "domain_leak":
+                assistant_text = get_out_of_scope_refusal()
+                logger.info(
+                    "phase6_5.guardrail_replaced_response",
+                    extra={"reason": "domain_leak"},
+                )
+
         assistant_message = self.conversation_controller.create_assistant_message(
             conversation_id,
-            completion.assistant_text,
+            assistant_text,
             tool_calls=tool_call_records_to_storage_payload(all_tool_call_records),
             source_refs=source_refs,
         )
@@ -465,12 +568,14 @@ class ChatController:
     def _intent_to_route(intent: str) -> str:
         if intent == "rfq_specific":
             return "tools_pipeline"
-        if intent == "general_knowledge":
+        if intent == "domain_knowledge":
             return "direct_llm"
         if intent == "unsupported":
             return "capability_status"
         if intent == "disambiguation":
             return "disambiguation"
+        if intent == "out_of_scope":
+            return "deterministic_refusal"
         return "conversational"
 
     @staticmethod
@@ -693,6 +798,13 @@ class ChatController:
         )
         return any(normalized.startswith(prefix) for prefix in greeting_prefixes)
 
+    @classmethod
+    def _is_short_greeting_turn(cls, content: str) -> bool:
+        normalized = content.strip()
+        if not cls._is_greeting_turn(normalized):
+            return False
+        return len(normalized.split()) <= 3
+
     def _build_welcome_guidance_lines(
         self,
         *,
@@ -704,7 +816,7 @@ class ChatController:
             return [
                 "This is a first-turn conversational greeting in portfolio mode.",
                 "Reply with a concise, warm welcome tailored for portfolio-wide support.",
-                "Offer 1-2 concrete next actions the user can ask about across RFQs.",
+                "Keep it to 2-3 sentences and end with one simple optional question.",
             ]
 
         rfq_detail = None
@@ -723,15 +835,15 @@ class ChatController:
             f"RFQ name: {rfq_name or 'Unavailable'}",
             f"Client: {client_name or 'Unavailable'}",
             f"Current stage: {stage_name or 'Unavailable'}",
-            "Offer 1-2 concrete next actions relevant to the RFQ context.",
+            "Keep it to 2-3 sentences, avoid analysis, and end with one simple optional question.",
         ]
 
     @staticmethod
     def _build_follow_up_guidance_lines() -> list[str]:
         return [
-            "End the response with 1-2 contextual follow-up suggestions.",
-            "Keep follow-up suggestions grounded in retrieved RFQ facts and current stage context.",
-            "When facts are insufficient, suggest precise clarifying follow-up questions instead.",
+            "Provide at most 1-2 lightweight optional next questions.",
+            "Phrase follow-ups as optional questions, not action plans or instructions.",
+            "Only propose next questions when they are grounded in the current user request and retrieved facts.",
         ]
 
     @staticmethod

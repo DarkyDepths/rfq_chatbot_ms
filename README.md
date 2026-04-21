@@ -96,6 +96,23 @@ ruff check .
 pytest
 ```
 
+## Standalone Test Console
+
+When the service is running, open this URL in your browser:
+
+```text
+http://localhost:8003/rfq-chatbot/v1/test-console
+```
+
+The console is a zero-build HTML harness for validating chatbot behavior before
+integrating into `rfq_ui_ms`. It supports:
+
+- Session creation (`rfq` and `global` entry modes)
+- Turn submission and response rendering
+- Source reference visibility per assistant turn
+- Health and readiness checks (`/health`, `/ready`)
+- Correlation ID visibility from API responses
+
 ## Configuration
 
 | Variable | Required | Default | Purpose |

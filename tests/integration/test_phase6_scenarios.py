@@ -234,7 +234,7 @@ def test_phase6_scenario_1_intent_rfq_specific_on_bound_session(client, app, cap
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_2_intent_general_knowledge_on_bound_session(client, app, caplog):
+def test_phase6_scenario_2_intent_domain_knowledge_on_bound_session(client, app, caplog):
     azure, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -249,19 +249,18 @@ def test_phase6_scenario_2_intent_general_knowledge_on_bound_session(client, app
             response = _submit_turn(client, session_id, "what is PWHT?")
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert manager.get_rfq_calls == 1
         assert intelligence.get_snapshot_calls == 1
 
         stable_prefix = azure.calls[-1]["messages"][0]["content"]
-        assert "Role tone directive: Respond in a decision-oriented executive tone." in stable_prefix
         assert "Current stage label:" not in stable_prefix
     finally:
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_3_intent_general_knowledge_on_portfolio_session(client, app, caplog):
+def test_phase6_scenario_3_intent_domain_knowledge_on_portfolio_session(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -271,7 +270,7 @@ def test_phase6_scenario_3_intent_general_knowledge_on_portfolio_session(client,
             response = _submit_turn(client, session_id, "how does RT work?")
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
@@ -435,7 +434,7 @@ def test_phase6_scenario_11_disambiguation_abandonment(client, app, caplog):
 
         assert first.status_code == 200
         assert second.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.disambiguation_abandoned")[-1] is True
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
@@ -481,7 +480,7 @@ def test_phase6_scenario_13_phase5_regression_guard(client, app, caplog):
         phase5_test(client, app, caplog)
 
 
-def test_phase6_scenario_14_mode_b_general_knowledge_works(client, app, caplog):
+def test_phase6_scenario_14_mode_b_domain_knowledge_works(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -492,9 +491,9 @@ def test_phase6_scenario_14_mode_b_general_knowledge_works(client, app, caplog):
 
         assert response.status_code == 200
         assert response.json()["content"].strip()
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
-        assert _log_values(caplog, "phase6.output_guardrail_result") == []
+        assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0

@@ -193,3 +193,29 @@ def test_chat_controller_persists_tool_calls_and_source_refs_for_retrieval_turn(
     assert assistant_message.tool_calls[0]["tool_name"] == "get_rfq_profile"
     assert assistant_message.source_refs[0]["artifact"] == "rfq"
     assert "Tool: get_rfq_profile" in fake_connector.calls[0]["messages"][-1]["content"]
+
+
+def test_chat_controller_first_turn_short_greeting_injects_greeting_mode_signal(db_session):
+    session_ds, _conversation_controller, fake_connector, chat_controller = (
+        _build_chat_controller(db_session)
+    )
+    chatbot_session = session_ds.create(
+        ChatbotSessionCreate(
+            user_id="u1",
+            rfq_id=str(uuid.uuid4()),
+            mode=SessionMode.RFQ_BOUND,
+            role="estimation_dept_lead",
+        )
+    )
+    db_session.commit()
+
+    response = chat_controller.handle_turn(
+        chatbot_session.id,
+        TurnCreateCommand(content="hello"),
+    )
+
+    assert response.role == "assistant"
+    stable_prefix = fake_connector.calls[0]["messages"][0]["content"]
+    assert "<turn_mode>" in stable_prefix
+    assert "greeting" in stable_prefix
+    assert "Offer 1-2 concrete next actions" not in stable_prefix
