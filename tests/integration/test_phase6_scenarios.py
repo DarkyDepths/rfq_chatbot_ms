@@ -49,6 +49,11 @@ class ScenarioAzureConnector:
         if latest_turn_marker in latest_user_turn:
             latest_user_turn = latest_user_turn.split(latest_turn_marker, 1)[1]
 
+        if "Domain scope recheck mode: classification only." in stable_prefix:
+            if "brown field" in latest_user_turn:
+                return ChatCompletionResult(assistant_text="definitely_relevant")
+            return ChatCompletionResult(assistant_text="not_relevant")
+
         if "Disambiguation behavior: RFQ resolution mode." in stable_prefix:
             return ChatCompletionResult(
                 assistant_text=(
@@ -234,7 +239,7 @@ def test_phase6_scenario_1_intent_rfq_specific_on_bound_session(client, app, cap
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_2_intent_general_knowledge_on_bound_session(client, app, caplog):
+def test_phase6_scenario_2_intent_domain_knowledge_on_bound_session(client, app, caplog):
     azure, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -249,19 +254,18 @@ def test_phase6_scenario_2_intent_general_knowledge_on_bound_session(client, app
             response = _submit_turn(client, session_id, "what is PWHT?")
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert manager.get_rfq_calls == 1
         assert intelligence.get_snapshot_calls == 1
 
         stable_prefix = azure.calls[-1]["messages"][0]["content"]
-        assert "Role tone directive: Respond in a decision-oriented executive tone." in stable_prefix
         assert "Current stage label:" not in stable_prefix
     finally:
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_3_intent_general_knowledge_on_portfolio_session(client, app, caplog):
+def test_phase6_scenario_3_intent_domain_knowledge_on_portfolio_session(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -271,7 +275,7 @@ def test_phase6_scenario_3_intent_general_knowledge_on_portfolio_session(client,
             response = _submit_turn(client, session_id, "how does RT work?")
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
@@ -300,7 +304,7 @@ def test_phase6_scenario_4_intent_unsupported_via_capability_status(client, app,
 
 
 def test_phase6_scenario_5_intent_conversational_fallback(client, app, caplog):
-    _, manager, intelligence = _setup_scenario_dependencies(app)
+    azure, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
         session_id = _create_session(client, mode="global")
@@ -316,6 +320,7 @@ def test_phase6_scenario_5_intent_conversational_fallback(client, app, caplog):
         assert payload["source_refs"] == []
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
+        assert len(azure.calls) == 0
     finally:
         _clear_dependencies(app)
 
@@ -350,7 +355,10 @@ def test_phase6_scenario_7_grounding_enforcement_with_tool_failure(client, app, 
             response = _submit_turn(client, session_id, "what's the deadline?")
 
         assert response.status_code == 200
-        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        content = response.json()["content"].lower()
+        assert "don't have grounded" in content
+        assert "deadline" in content
+        assert response.json()["source_refs"] == []
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
@@ -361,7 +369,7 @@ def test_phase6_scenario_7_grounding_enforcement_with_tool_failure(client, app, 
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_8_grounding_mismatch_no_tool_keyword_match(client, app, caplog):
+def test_phase6_scenario_8_unified_summary_handles_no_tool_keyword_match(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -371,12 +379,16 @@ def test_phase6_scenario_8_grounding_mismatch_no_tool_keyword_match(client, app,
             response = _submit_turn(client, session_id, "tell me about this RFQ")
 
         assert response.status_code == 200
-        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        content = response.json()["content"]
+        assert "Boiler Upgrade" in content
+        assert "Sarah" in content
+        assert "2026-05-01" in content
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
-        assert _log_values(caplog, "phase6.grounding_mismatch")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
+        assert _log_values(caplog, "phase5.tools_keyword_matched")[-1] == []
         assert manager.get_rfq_calls == 1
         assert intelligence.get_snapshot_calls == 1
     finally:
@@ -435,7 +447,7 @@ def test_phase6_scenario_11_disambiguation_abandonment(client, app, caplog):
 
         assert first.status_code == 200
         assert second.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.disambiguation_abandoned")[-1] is True
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
@@ -443,7 +455,7 @@ def test_phase6_scenario_11_disambiguation_abandonment(client, app, caplog):
         _clear_dependencies(app)
 
 
-def test_phase6_scenario_12_output_guardrail_soft_enforcement(client, app, caplog):
+def test_phase6_scenario_12_normalized_rfq_summary_passes_guardrail(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -453,8 +465,10 @@ def test_phase6_scenario_12_output_guardrail_soft_enforcement(client, app, caplo
             response = _submit_turn(client, session_id, "tell me about this RFQ")
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.grounding_mismatch")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
+        assert "Boiler Upgrade" in response.json()["content"]
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
         assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
         assert manager.get_rfq_calls == 1
         assert intelligence.get_snapshot_calls == 1
@@ -464,9 +478,9 @@ def test_phase6_scenario_12_output_guardrail_soft_enforcement(client, app, caplo
 
 def test_phase6_scenario_13_phase5_regression_guard(client, app, caplog):
     phase5_tests = [
-        phase5_scenarios.test_phase5_scenario_1_role_contrast_same_rfq,
-        phase5_scenarios.test_phase5_scenario_2_stage_contrast_same_question,
-        phase5_scenarios.test_phase5_scenario_3_confidence_marker_presence_and_absence,
+        phase5_scenarios.test_phase5_scenario_1_role_observability_same_rfq,
+        phase5_scenarios.test_phase5_scenario_2_stage_resolution_observability_same_question,
+        phase5_scenarios.test_phase5_scenario_3_deterministic_rfq_answers_do_not_emit_confidence_markers,
         phase5_scenarios.test_phase5_scenario_4_capability_status_absence,
         phase5_scenarios.test_phase5_scenario_5_trivial_no_retrieval_turn,
         phase5_scenarios.test_phase5_scenario_6_graceful_degradation_on_stage_resolution_failure,
@@ -481,7 +495,7 @@ def test_phase6_scenario_13_phase5_regression_guard(client, app, caplog):
         phase5_test(client, app, caplog)
 
 
-def test_phase6_scenario_14_mode_b_general_knowledge_works(client, app, caplog):
+def test_phase6_scenario_14_mode_b_domain_knowledge_works(client, app, caplog):
     _, manager, intelligence = _setup_scenario_dependencies(app)
 
     try:
@@ -492,11 +506,102 @@ def test_phase6_scenario_14_mode_b_general_knowledge_works(client, app, caplog):
 
         assert response.status_code == 200
         assert response.json()["content"].strip()
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
-        assert _log_values(caplog, "phase6.output_guardrail_result") == []
+        assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_phase6_scenario_15_rfq_greeting_then_current_details_returns_grounded_snapshot(
+    client, app, caplog
+):
+    _, manager, intelligence = _setup_scenario_dependencies(app)
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            greeting_response = _submit_turn(client, session_id, "hello")
+
+        greeting_payload = greeting_response.json()
+        assert greeting_response.status_code == 200
+        assert "boiler upgrade" in greeting_payload["content"].lower()
+        assert "acme industrial" in greeting_payload["content"].lower()
+
+        caplog.clear()
+
+        with caplog.at_level(logging.INFO):
+            details_response = _submit_turn(
+                client,
+                session_id,
+                "what is the current details about this rfq",
+            )
+
+        details_payload = details_response.json()
+        assert details_response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "tools_pipeline"
+        assert _log_values(caplog, "phase6.rfq_response_mode")[-1] == "RFQ_DETAIL"
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert any(
+            source_ref["system"] == "rfq_intelligence_ms"
+            for source_ref in details_payload["source_refs"]
+        )
+        assert manager.get_rfq_calls >= 1
+        assert intelligence.get_snapshot_calls >= 2
+    finally:
+        _clear_dependencies(app)
+
+
+def test_phase6_scenario_16_rfq_summary_is_structured_and_grounded(client, app, caplog):
+    _, manager, intelligence = _setup_scenario_dependencies(app)
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response = _submit_turn(client, session_id, "tell me about this rfq")
+
+        payload = response.json()
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.rfq_response_mode")[-1] == "RFQ_SUMMARY"
+        assert payload["content"].startswith("RFQ summary\n")
+        assert "Readiness\n" in payload["content"]
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert manager.get_rfq_calls >= 1
+        assert intelligence.get_snapshot_calls >= 1
+    finally:
+        _clear_dependencies(app)
+
+
+def test_phase6_scenario_17_rfq_advisory_is_signal_based_and_structured(
+    client, app, caplog
+):
+    _, manager, intelligence = _setup_scenario_dependencies(app)
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response = _submit_turn(client, session_id, "what needs attention right now?")
+
+        payload = response.json()
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.rfq_response_mode")[-1] == "RFQ_ADVISORY"
+        assert payload["content"].startswith("RFQ advisory\n")
+        assert "Main concerns\n" in payload["content"]
+        assert "Missing / incomplete\n" in payload["content"]
+        assert "What needs attention\n" in payload["content"]
+        assert "human review" in payload["content"].lower()
+        assert "workbook" in payload["content"].lower()
+        assert "review" in payload["content"].lower()
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert manager.get_rfq_calls >= 1
+        assert intelligence.get_snapshot_calls >= 1
     finally:
         _clear_dependencies(app)

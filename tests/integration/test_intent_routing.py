@@ -36,6 +36,13 @@ class EchoAzureConnector:
     def create_chat_completion(self, messages, tools=None):
         stable_prefix = messages[0]["content"]
         self.calls.append({"messages": messages, "tools": tools})
+        latest_user_turn = messages[-1]["content"].lower()
+        if "Domain scope recheck mode: classification only." in stable_prefix:
+            if "brown field" in latest_user_turn or "aramco" in latest_user_turn:
+                return ChatCompletionResult(assistant_text="definitely_relevant")
+            if "legacy" in latest_user_turn:
+                return ChatCompletionResult(assistant_text="possibly_relevant")
+            return ChatCompletionResult(assistant_text="not_relevant")
         if "Grounding behavior: grounding gap mode." in stable_prefix:
             return ChatCompletionResult(
                 assistant_text="I cannot retrieve the requested information right now."
@@ -190,7 +197,7 @@ def test_route_rfq_specific_uses_tools_pipeline(client, app, caplog):
         _clear_dependencies(app)
 
 
-def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(client, app, caplog):
+def test_route_domain_knowledge_on_rfq_bound_uses_direct_llm_without_tools(client, app, caplog):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
@@ -211,8 +218,9 @@ def test_route_general_knowledge_on_rfq_bound_uses_direct_llm_without_tools(clie
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked") == []
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert _log_values(caplog, "phase6.grounding_satisfied") == []
         assert manager.get_rfq_calls == 1
@@ -242,17 +250,23 @@ def test_grounding_gap_when_tool_retrieval_attempt_fails(client, app, caplog):
             )
 
         assert response.status_code == 200
-        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        content = response.json()["content"].lower()
+        assert "don't have grounded" in content
+        assert "deadline" in content
+        assert response.json()["source_refs"] == []
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_dependencies(app)
 
 
-def test_grounding_mismatch_when_rfq_specific_but_no_tool_keyword_match(client, app, caplog):
+def test_rfq_specific_without_planner_keyword_uses_unified_grounded_summary(
+    client, app, caplog
+):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
@@ -273,12 +287,17 @@ def test_grounding_mismatch_when_rfq_specific_but_no_tool_keyword_match(client, 
             )
 
         assert response.status_code == 200
-        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        content = response.json()["content"]
+        assert "Boiler Upgrade" in content
+        assert "Sarah" in content
+        assert "2026-05-01" in content
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
-        assert _log_values(caplog, "phase6.grounding_mismatch")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
+        assert _log_values(caplog, "phase5.tools_keyword_matched")[-1] == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_dependencies(app)
 
@@ -366,11 +385,12 @@ def test_route_conversational_in_any_session(client, app, caplog):
         assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_dependencies(app)
 
 
-def test_route_general_knowledge_on_portfolio_session_uses_direct_llm(client, app, caplog):
+def test_route_domain_knowledge_on_portfolio_session_uses_direct_llm(client, app, caplog):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector()
     intelligence = CountingIntelligenceConnector()
@@ -391,9 +411,365 @@ def test_route_general_knowledge_on_portfolio_session_uses_direct_llm(client, ap
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked") == []
         assert manager.get_rfq_calls == 0
         assert intelligence.get_snapshot_calls == 0
+    finally:
+        _clear_dependencies(app)
+
+
+# ──────────────────────────────────────────────
+# Phase 6.5 regression: out-of-scope routing integration
+# ──────────────────────────────────────────────
+
+def test_route_out_of_scope_bread_uses_deterministic_refusal(client, app, caplog):
+    """Bread question must be classified out_of_scope and routed to deterministic_refusal."""
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "how to prepare bread at home"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        # No LLM call should have been made
+        assert len(fake_azure.calls) == 0
+        # Response must contain RFQ-redirect language
+        content = response.json()["content"]
+        assert "rfq" in content.lower() or "scope" in content.lower()
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_out_of_scope_sport_uses_deterministic_refusal(client, app, caplog):
+    """Sport question must be classified out_of_scope."""
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "how to play sport"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        assert len(fake_azure.calls) == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_out_of_scope_pasta_after_rfq_turn_stays_refused(client, app, caplog):
+    """Multi-turn stability: pasta question after valid RFQ turn must still refuse."""
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        # Turn 1: valid RFQ question
+        with caplog.at_level(logging.INFO):
+            response1 = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what's the deadline?"},
+            )
+        assert response1.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+
+        caplog.clear()
+
+        # Turn 2: out-of-scope question (must refuse)
+        with caplog.at_level(logging.INFO):
+            response2 = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "how to cook pasta"},
+            )
+        assert response2.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_chitchat_joke_uses_deterministic_refusal(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "tell me a joke"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        assert len(fake_azure.calls) == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_how_are_you_uses_deterministic_refusal(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "how are you?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        assert len(fake_azure.calls) == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_reset_phrases_skip_azure(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        for content in ("never mind", "start over"):
+            session_id = _create_session(client, mode="global")
+            caplog.clear()
+
+            with caplog.at_level(logging.INFO):
+                response = client.post(
+                    f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                    json={"content": content},
+                )
+
+            assert response.status_code == 200
+            assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
+
+        assert len(fake_azure.calls) == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_stainless_steel_pans_after_rfq_turn_is_refused(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response1 = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what's the deadline?"},
+            )
+        assert response1.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+
+        caplog.clear()
+
+        with caplog.at_level(logging.INFO):
+            response2 = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "and what about stainless steel pans?"},
+            )
+
+        assert response2.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        assert len(fake_azure.calls) == 0
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_semantic_recheck_only_for_unresolved_knowledge_like_turn(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "brown field and green field what do they mean"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked")[-1] is True
+        assert _log_values(caplog, "phase6.domain_recheck_label")[-1] == "definitely_relevant"
+        assert _log_values(caplog, "phase6.domain_recheck_final_intent")[-1] == "domain_knowledge"
+        assert len(fake_azure.calls) == 2
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_strong_domain_anchor_skips_recheck(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "do u know about aramco?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked") == []
+        assert len(fake_azure.calls) == 1
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_semantic_recheck_possibly_relevant_stays_out_of_scope(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what does legacy mean here?"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "out_of_scope"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "deterministic_refusal"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked")[-1] is True
+        assert _log_values(caplog, "phase6.domain_recheck_label")[-1] == "possibly_relevant"
+        assert _log_values(caplog, "phase6.domain_recheck_final_intent")[-1] == "out_of_scope"
+        assert len(fake_azure.calls) == 1
+    finally:
+        _clear_dependencies(app)
+
+
+def test_route_current_details_about_this_rfq_reaches_snapshot_tools_pipeline(client, app, caplog):
+    fake_azure = EchoAzureConnector()
+    manager = CountingManagerConnector()
+    intelligence = CountingIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="rfq", rfq_id=str(uuid.uuid4()))
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "what is the current details about this rfq"},
+            )
+
+        payload = response.json()
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
+        assert _log_values(caplog, "phase6.route_selected")[-1] == "tools_pipeline"
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert any(
+            source_ref["system"] == "rfq_intelligence_ms"
+            for source_ref in payload["source_refs"]
+        )
+        assert intelligence.get_snapshot_calls >= 1
     finally:
         _clear_dependencies(app)

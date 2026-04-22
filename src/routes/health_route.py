@@ -1,15 +1,18 @@
 """Operational health endpoint."""
 
+from pathlib import Path
+
 from sqlalchemy import text
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from src.connectors.azure_openai_connector import AzureOpenAIConnector
 from src.database import get_engine
 
 
 router = APIRouter(tags=["Health"])
+TEST_CONSOLE_PATH = Path(__file__).resolve().parents[2] / "rfq_copilot_test_console.html"
 
 
 @router.get("/health", include_in_schema=False)
@@ -54,4 +57,17 @@ def readiness_check():
             },
         },
     )
+
+
+@router.get("/rfq-chatbot/v1/test-console", include_in_schema=False)
+def rfq_copilot_test_console():
+    """Serve the standalone RFQ Copilot HTML test console."""
+
+    if not TEST_CONSOLE_PATH.exists():
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "rfq_copilot_test_console.html not found"},
+        )
+
+    return FileResponse(TEST_CONSOLE_PATH)
 

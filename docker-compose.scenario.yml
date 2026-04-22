@@ -1,0 +1,64 @@
+services:
+  chatbot_db:
+    image: postgres:16
+    container_name: rfq_scenario_chatbot_postgres
+    environment:
+      POSTGRES_USER: chatbot_user
+      POSTGRES_PASSWORD: chatbot_pass
+      POSTGRES_DB: rfq_chatbot_scenario_db
+    ports:
+      - "15434:5432"
+    volumes:
+      - rfq_scenario_chatbot_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatbot_user -d rfq_chatbot_scenario_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chatbot_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rfq_scenario_chatbot_api
+    environment:
+      DATABASE_URL: postgresql+psycopg2://chatbot_user:chatbot_pass@chatbot_db:5432/rfq_chatbot_scenario_db
+      APP_ENV: development
+      APP_PORT: 8003
+      APP_DEBUG: "false"
+      CORS_ORIGINS: "*"
+      MANAGER_BASE_URL: http://host.docker.internal:18000
+      INTELLIGENCE_BASE_URL: http://host.docker.internal:18001
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-12-01-preview}
+      AZURE_OPENAI_CHAT_DEPLOYMENT: ${AZURE_OPENAI_CHAT_DEPLOYMENT:-}
+      AZURE_OPENAI_TIMEOUT_SECONDS: ${AZURE_OPENAI_TIMEOUT_SECONDS:-30}
+      AUTH_BYPASS_ENABLED: "true"
+      AUTH_BYPASS_USER_ID: scenario-user
+      AUTH_BYPASS_USER_NAME: Scenario User
+      AUTH_BYPASS_ROLE: estimation_dept_lead
+    ports:
+      - "8003:8003"
+    depends_on:
+      chatbot_db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >-
+      sh -c "set -e;
+      echo '[scenario-bootstrap] Applying chatbot migrations...';
+      alembic upgrade head;
+      echo '[scenario-bootstrap] Starting chatbot API server...';
+      exec uvicorn src.app:app --host 0.0.0.0 --port 8003"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ./:/app
+
+volumes:
+  rfq_scenario_chatbot_postgres_data:

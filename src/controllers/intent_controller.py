@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
@@ -10,8 +11,19 @@ from src.config.disambiguation_config import (
     MAX_RESOLUTION_WORD_COUNT,
     RFQ_REFERENCE_PATTERNS,
 )
-from src.config.intent_patterns import FALLBACK_INTENT, INTENT_PATTERNS
+from src.config.intent_patterns import (
+    FALLBACK_INTENT,
+    INTENT_PATTERNS,
+    classify_conversational_subtype,
+    message_is_knowledge_like_turn,
+    message_contains_off_domain_indicator,
+    message_contains_domain_term,
+)
+from src.controllers.domain_scope_recheck_controller import DomainScopeRecheckController
 from src.models.session import ChatbotSession, SessionMode
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -22,12 +34,16 @@ class IntentClassification:
     disambiguation_resolved: bool
     resolved_rfq_reference: str | None
     disambiguation_abandoned: bool
+    conversational_subtype: str | None = None
 
 
 class IntentController:
     """Classifies user turns using deterministic patterns and session context."""
 
     continuity_max_word_count = 6
+    allowed_conversational_subtypes = frozenset(
+        {"greeting", "identity", "thanks", "goodbye", "correction", "reset", "repeat"}
+    )
     continuity_follow_up_cues = (
         "and",
         "also",
@@ -41,6 +57,35 @@ class IntentController:
         "then",
         "next",
     )
+    continuity_anchor_tokens = frozenset(
+        {"this", "that", "it", "its", "same", "one", "then", "next"}
+    )
+    continuity_allowed_tokens = continuity_anchor_tokens | frozenset(
+        {"and", "also", "what", "about", "how", "the", "please", "pls"}
+    )
+    rfq_advisory_terms = (
+        "watch out",
+        "watch for",
+        "risk",
+        "risks",
+        "concern",
+        "concerns",
+        "missing",
+        "incomplete",
+        "gap",
+        "gaps",
+        "needs attention",
+        "need attention",
+        "attention right now",
+        "readiness",
+        "ready",
+    )
+
+    def __init__(
+        self,
+        domain_scope_recheck_controller: DomainScopeRecheckController | None = None,
+    ):
+        self.domain_scope_recheck_controller = domain_scope_recheck_controller
 
     def classify_intent(
         self,
@@ -49,7 +94,7 @@ class IntentController:
         last_assistant_content: str | None,
         last_resolved_intent: str | None = None,
     ) -> IntentClassification:
-        """Classify one user turn into the frozen 5-intent taxonomy."""
+        """Classify one user turn into the frozen intent taxonomy."""
 
         normalized_content = self._normalize(user_content)
 
@@ -66,46 +111,67 @@ class IntentController:
 
                 classified_intent = self._classify_normal(
                     normalized_content=normalized_content,
+                    user_content=user_content,
                     session=session,
                 )
-                abandoned = classified_intent in {"conversational", "general_knowledge"}
+                abandoned = classified_intent in {"conversational", "domain_knowledge"}
+                subtype = None
+                if classified_intent == "conversational":
+                    subtype = classify_conversational_subtype(user_content)
                 return IntentClassification(
                     intent=classified_intent,
                     disambiguation_resolved=False,
                     resolved_rfq_reference=None,
                     disambiguation_abandoned=abandoned,
+                    conversational_subtype=subtype,
                 )
 
             classified_intent = self._classify_normal(
                 normalized_content=normalized_content,
+                user_content=user_content,
                 session=session,
             )
+            subtype = None
+            if classified_intent == "conversational":
+                subtype = classify_conversational_subtype(user_content)
             return IntentClassification(
                 intent=classified_intent,
                 disambiguation_resolved=False,
                 resolved_rfq_reference=None,
                 disambiguation_abandoned=True,
+                conversational_subtype=subtype,
             )
 
         classified_intent = self._classify_normal(
             normalized_content=normalized_content,
+            user_content=user_content,
             session=session,
             last_resolved_intent=last_resolved_intent,
         )
+        subtype = None
+        if classified_intent == "conversational":
+            subtype = classify_conversational_subtype(user_content)
         return IntentClassification(
             intent=classified_intent,
             disambiguation_resolved=False,
             resolved_rfq_reference=None,
             disambiguation_abandoned=False,
+            conversational_subtype=subtype,
         )
 
     def _classify_normal(
         self,
         *,
         normalized_content: str,
+        user_content: str,
         session: ChatbotSession,
         last_resolved_intent: str | None = None,
     ) -> str:
+        if not normalized_content:
+            return FALLBACK_INTENT
+
+        conversational_subtype = classify_conversational_subtype(normalized_content)
+
         if self._matches_intent(
             normalized_content=normalized_content,
             session=session,
@@ -126,22 +192,79 @@ class IntentController:
         ):
             return "rfq_specific"
 
-        if self._matches_intent(
+        if self._is_implicit_rfq_advisory_turn(
             normalized_content=normalized_content,
             session=session,
-            intent="general_knowledge",
         ):
-            return "general_knowledge"
+            return "rfq_specific"
+
+        if self._is_deterministic_domain_knowledge(normalized_content):
+            return "domain_knowledge"
 
         if self._should_apply_rfq_continuity_tiebreaker(
             normalized_content=normalized_content,
-            user_content=normalized_content,
+            user_content=user_content,
             session=session,
             last_resolved_intent=last_resolved_intent,
         ):
             return "rfq_specific"
 
-        return FALLBACK_INTENT
+        if conversational_subtype in self.allowed_conversational_subtypes:
+            return "conversational"
+
+        if conversational_subtype == "chitchat":
+            return "out_of_scope"
+
+        if message_contains_off_domain_indicator(normalized_content):
+            return "out_of_scope"
+
+        if message_is_knowledge_like_turn(user_content):
+            return self._classify_via_domain_scope_recheck(user_content)
+
+        return "out_of_scope"
+
+    @staticmethod
+    def _is_deterministic_domain_knowledge(normalized_content: str) -> bool:
+        return (
+            message_contains_domain_term(normalized_content)
+            and message_is_knowledge_like_turn(normalized_content)
+        )
+
+    def _classify_via_domain_scope_recheck(self, user_content: str) -> str:
+        if self.domain_scope_recheck_controller is None:
+            return "out_of_scope"
+
+        logger.info(
+            "phase6.domain_recheck_invoked=%s",
+            True,
+            extra={"phase6.domain_recheck_invoked": True},
+        )
+        label = self.domain_scope_recheck_controller.classify_domain_relevance(user_content)
+        logger.info(
+            "phase6.domain_recheck_label=%s",
+            label,
+            extra={"phase6.domain_recheck_label": label},
+        )
+
+        final_intent = "domain_knowledge" if label == "definitely_relevant" else "out_of_scope"
+        logger.info(
+            "phase6.domain_recheck_final_intent=%s",
+            final_intent,
+            extra={"phase6.domain_recheck_final_intent": final_intent},
+        )
+        return final_intent
+
+    def _is_implicit_rfq_advisory_turn(
+        self,
+        *,
+        normalized_content: str,
+        session: ChatbotSession,
+    ) -> bool:
+        if self._session_mode_value(session) != SessionMode.RFQ_BOUND.value:
+            return False
+        if message_contains_off_domain_indicator(normalized_content):
+            return False
+        return any(term in normalized_content for term in self.rfq_advisory_terms)
 
     def _should_apply_rfq_continuity_tiebreaker(
         self,
@@ -163,9 +286,20 @@ class IntentController:
         if self._word_count(user_content) > self.continuity_max_word_count:
             return False
 
-        return any(
-            cue in normalized_content for cue in self.continuity_follow_up_cues
-        )
+        if message_contains_off_domain_indicator(normalized_content):
+            return False
+
+        tokens = self._continuity_tokens(normalized_content)
+        if not tokens:
+            return False
+
+        if not any(token in self.continuity_anchor_tokens for token in tokens):
+            return False
+
+        if any(token not in self.continuity_allowed_tokens for token in tokens):
+            return False
+
+        return any(cue in normalized_content for cue in self.continuity_follow_up_cues)
 
     def _matches_disambiguation(self, *, normalized_content: str, session: ChatbotSession) -> bool:
         if self._matches_intent(
@@ -245,6 +379,10 @@ class IntentController:
         if not stripped:
             return 0
         return len(stripped.split())
+
+    @staticmethod
+    def _continuity_tokens(value: str) -> tuple[str, ...]:
+        return tuple(re.findall(r"[a-z0-9]+", value))
 
     @staticmethod
     def _is_disambiguation_prompt(last_assistant_content: str | None) -> bool:

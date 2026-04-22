@@ -10,11 +10,13 @@ from types import SimpleNamespace
 
 from src.connectors.azure_openai_connector import AzureOpenAIConnector
 from src.connectors.manager_connector import ManagerRfqDetail
+from src.config.intent_patterns import get_out_of_scope_refusal
 from src.controllers.context_builder import CONFIDENCE_PATTERN_MARKER, ContextBuilder
 from src.controllers.conversation_controller import ConversationController
 from src.controllers.disambiguation_controller import DisambiguationController
 from src.controllers.intent_controller import IntentClassification, IntentController
 from src.controllers.output_guardrail import OutputGuardrail
+from src.controllers.rfq_response_controller import RfqResponseController
 from src.controllers.role_controller import RoleController
 from src.controllers.stage_controller import StageController
 from src.controllers.tool_controller import CapabilityStatusHit, ToolController
@@ -67,6 +69,7 @@ class ChatController:
         intent_controller: IntentController,
         disambiguation_controller: DisambiguationController,
         output_guardrail: OutputGuardrail | None = None,
+        rfq_response_controller: RfqResponseController | None = None,
     ):
         self.session_datasource = session_datasource
         self.conversation_controller = conversation_controller
@@ -78,6 +81,7 @@ class ChatController:
         self.intent_controller = intent_controller
         self.disambiguation_controller = disambiguation_controller
         self.output_guardrail = output_guardrail or OutputGuardrail()
+        self.rfq_response_controller = rfq_response_controller or RfqResponseController()
 
     def handle_turn(
         self,
@@ -135,6 +139,15 @@ class ChatController:
                     extra={"phase6.disambiguation_abandoned": True},
                 )
 
+            # out_of_scope: deterministic refusal, no LLM call
+            if intent_result.intent == "out_of_scope":
+                return self._handle_out_of_scope(
+                    session=session,
+                    conversation_id=conversation.id,
+                    command=command,
+                    intent_result=intent_result,
+                )
+
             if intent_result.intent == "rfq_specific":
                 return self._handle_rfq_specific(
                     session=session,
@@ -145,11 +158,12 @@ class ChatController:
                     preloaded_rfq_context=preloaded_rfq_context,
                 )
 
-            if intent_result.intent == "general_knowledge":
-                return self._handle_general_knowledge(
+            if intent_result.intent == "domain_knowledge":
+                return self._handle_domain_knowledge(
                     session=session,
                     conversation_id=conversation.id,
                     command=command,
+                    intent_result=intent_result,
                     preloaded_rfq_context=preloaded_rfq_context,
                 )
 
@@ -173,11 +187,142 @@ class ChatController:
                 session=session,
                 conversation_id=conversation.id,
                 command=command,
+                intent_result=intent_result,
                 is_first_turn=is_first_turn,
                 preloaded_rfq_context=preloaded_rfq_context,
             )
         finally:
             response_latency_seconds.observe(time.perf_counter() - started_at)
+
+    def _handle_out_of_scope(
+        self,
+        *,
+        session,
+        conversation_id: uuid.UUID,
+        command: TurnCreateCommand,
+        intent_result: IntentClassification,
+    ) -> TurnResponse:
+        """Handle out-of-scope questions with deterministic refusal.
+        No LLM call. No context building. No tools.
+        """
+        refusal_text = get_out_of_scope_refusal()
+
+        logger.info(
+            "phase6_5.out_of_scope_refusal",
+            extra={
+                "intent": "out_of_scope",
+                "user_message_preview": command.content[:50],
+            },
+        )
+
+        return self._persist_plain_response(
+            conversation_id,
+            user_text=command.content,
+            assistant_text=refusal_text,
+        )
+
+    def _persist_plain_response(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        user_text: str,
+        assistant_text: str,
+    ) -> TurnResponse:
+        self.conversation_controller.create_user_message(conversation_id, user_text)
+        assistant_message = self.conversation_controller.create_assistant_message(
+            conversation_id,
+            assistant_text,
+            tool_calls=[],
+            source_refs=[],
+        )
+        return to_turn_response(conversation_id, assistant_message)
+
+    def _persist_structured_response(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        user_text: str,
+        assistant_text: str,
+        tool_call_records: list[ToolCallRecord],
+        source_refs: list[dict],
+    ) -> TurnResponse:
+        self.conversation_controller.create_user_message(conversation_id, user_text)
+        assistant_message = self.conversation_controller.create_assistant_message(
+            conversation_id,
+            assistant_text,
+            tool_calls=tool_call_records_to_storage_payload(tool_call_records),
+            source_refs=source_refs,
+        )
+        return to_turn_response(conversation_id, assistant_message)
+
+    def _handle_deterministic_conversational(
+        self,
+        *,
+        session,
+        conversation_id: uuid.UUID,
+        command: TurnCreateCommand,
+        subtype: str,
+        preloaded_rfq_context: PreloadedRfqContext,
+    ) -> TurnResponse:
+        return self._persist_plain_response(
+            conversation_id,
+            user_text=command.content,
+            assistant_text=self._build_deterministic_conversational_response(
+                session=session,
+                subtype=subtype,
+                preloaded_rfq_context=preloaded_rfq_context,
+            ),
+        )
+
+    def _build_deterministic_conversational_response(
+        self,
+        *,
+        session,
+        subtype: str,
+        preloaded_rfq_context: PreloadedRfqContext,
+    ) -> str:
+        if subtype == "greeting":
+            return self._build_deterministic_greeting(
+                session=session,
+                preloaded_rfq_context=preloaded_rfq_context,
+            )
+        if subtype == "identity":
+            return "I'm RFQ Copilot, your estimation assistant for RFQs."
+        if subtype == "thanks":
+            return "You're welcome."
+        if subtype == "goodbye":
+            return "Goodbye."
+        if subtype == "reset":
+            return "No problem. We can start fresh. What would you like to check?"
+        raise ValueError(f"Unsupported deterministic conversational subtype: {subtype}")
+
+    def _build_deterministic_greeting(
+        self,
+        *,
+        session,
+        preloaded_rfq_context: PreloadedRfqContext,
+    ) -> str:
+        if self._session_mode_value(session) != SessionMode.RFQ_BOUND.value:
+            return "Hi! I'm RFQ Copilot. How can I help with your RFQs?"
+
+        rfq_detail = preloaded_rfq_context.rfq_detail
+        rfq_name = getattr(rfq_detail, "name", None) if rfq_detail is not None else None
+        client_name = getattr(rfq_detail, "client", None) if rfq_detail is not None else None
+        stage_name = getattr(rfq_detail, "current_stage_name", None) if rfq_detail is not None else None
+
+        if rfq_name and client_name:
+            opening = f"Hi! I'm ready to help with RFQ {rfq_name} for {client_name}."
+        elif rfq_name:
+            opening = f"Hi! I'm ready to help with RFQ {rfq_name}."
+        elif client_name:
+            opening = f"Hi! I'm ready to help with this RFQ for {client_name}."
+        else:
+            opening = "Hi! I'm ready to help with this RFQ."
+
+        if stage_name:
+            opening = f"{opening} It is currently in {stage_name}."
+
+        return f"{opening} What would you like to check?"
 
     def _handle_rfq_specific(
         self,
@@ -213,6 +358,8 @@ class ChatController:
                 tool_call_records=[],
                 supplemental_tool_call_records=preloaded_rfq_context.tool_call_records,
                 turn_guidance_lines=turn_guidance_lines,
+                intent="conversational",
+                conversational_subtype="greeting",
             )
 
         try:
@@ -231,12 +378,18 @@ class ChatController:
             *tool_call_records,
         ]
 
-        has_evidence = any(
-            record.result is not None
-            and record.result.confidence != ConfidenceLevel.ABSENT
-            and record.result.source_ref is not None
-            for record in tool_call_records
+        response_plan = self.rfq_response_controller.compose_response(
+            user_content=command.content,
+            rfq_detail=stage_resolution.rfq_detail,
+            tool_call_records=all_tool_call_records,
+            rfq_id=getattr(effective_session, "rfq_id", None),
         )
+        logger.info(
+            "phase6.rfq_response_mode=%s",
+            response_plan.response_mode,
+            extra={"phase6.rfq_response_mode": response_plan.response_mode},
+        )
+        has_evidence = response_plan.grounded
         grounding_gap = not has_evidence
         tool_planner_fired = len(tool_call_records) > 0
 
@@ -264,24 +417,36 @@ class ChatController:
                 extra={"phase6.grounding_gap_absence_injected": True},
             )
 
-        return self._generate_and_persist_turn(
-            conversation_id=conversation_id,
-            latest_user_turn=command.content,
-            stage_resolution=stage_resolution,
-            role_resolution=role_resolution,
-            tool_call_records=all_tool_call_records,
-            grounding_gap=grounding_gap,
-            turn_guidance_lines=self._build_follow_up_guidance_lines(),
-            intent="rfq_specific",
-            apply_output_guardrail=True,
+        record_tool_calls([record.tool_name for record in response_plan.tool_call_records])
+        logger.info(
+            "phase5.confidence_marker_emitted=%s",
+            False,
+            extra={"phase5.confidence_marker_emitted": False},
+        )
+        logger.info(
+            "phase6.output_guardrail_result=%s",
+            "pass",
+            extra={"phase6.output_guardrail_result": "pass"},
         )
 
-    def _handle_general_knowledge(
+        return self._persist_structured_response(
+            conversation_id=conversation_id,
+            user_text=command.content,
+            assistant_text=response_plan.assistant_text,
+            tool_call_records=response_plan.tool_call_records,
+            source_refs=[
+                source_ref.model_dump(mode="json")
+                for source_ref in response_plan.source_refs
+            ],
+        )
+
+    def _handle_domain_knowledge(
         self,
         *,
         session,
         conversation_id: uuid.UUID,
         command: TurnCreateCommand,
+        intent_result: IntentClassification,
         preloaded_rfq_context: PreloadedRfqContext,
     ) -> TurnResponse:
         role_resolution = self.role_controller.resolve_role(session)
@@ -293,6 +458,9 @@ class ChatController:
             stage_resolution=None,
             role_resolution=role_resolution,
             tool_call_records=[],
+            intent="domain_knowledge",
+            apply_output_guardrail=True,
+            conversational_subtype=None,
         )
 
     def _handle_unsupported(
@@ -359,28 +527,50 @@ class ChatController:
         session,
         conversation_id: uuid.UUID,
         command: TurnCreateCommand,
+        intent_result: IntentClassification,
         is_first_turn: bool,
         preloaded_rfq_context: PreloadedRfqContext,
     ) -> TurnResponse:
-        turn_guidance_lines = None
-        if is_first_turn and self._is_greeting_turn(command.content):
-            turn_guidance_lines = self._build_welcome_guidance_lines(
+        subtype = intent_result.conversational_subtype or "generic"
+
+        if subtype in {"greeting", "identity", "thanks", "goodbye", "reset"}:
+            return self._handle_deterministic_conversational(
                 session=session,
-                stage_resolution=None,
+                conversation_id=conversation_id,
+                command=command,
+                subtype=subtype,
                 preloaded_rfq_context=preloaded_rfq_context,
             )
-            supplemental_tool_call_records = preloaded_rfq_context.tool_call_records
-        else:
-            supplemental_tool_call_records = []
 
+        turn_guidance_lines = None
         return self._generate_and_persist_turn(
             conversation_id=conversation_id,
             latest_user_turn=command.content,
             stage_resolution=None,
             role_resolution=None,
             tool_call_records=[],
-            supplemental_tool_call_records=supplemental_tool_call_records,
             turn_guidance_lines=turn_guidance_lines,
+            intent="conversational",
+            conversational_subtype=subtype,
+            apply_output_guardrail=True,
+        )
+
+    def _handle_greeting(
+        self,
+        *,
+        session,
+        conversation_id: uuid.UUID,
+        command: TurnCreateCommand,
+        intent_result: IntentClassification,
+        is_first_turn: bool,
+        preloaded_rfq_context: PreloadedRfqContext,
+    ) -> TurnResponse:
+        return self._handle_deterministic_conversational(
+            session=session,
+            conversation_id=conversation_id,
+            command=command,
+            subtype="greeting",
+            preloaded_rfq_context=preloaded_rfq_context,
         )
 
     def _generate_and_persist_turn(
@@ -395,8 +585,10 @@ class ChatController:
         grounding_gap: bool = False,
         disambiguation_context: dict | None = None,
         turn_guidance_lines: list[str] | None = None,
+        greeting_mode: bool = False,
         intent: str | None = None,
         apply_output_guardrail: bool = False,
+        conversational_subtype: str | None = None,
     ) -> TurnResponse:
 
         supplemental_tool_call_records = supplemental_tool_call_records or []
@@ -409,6 +601,11 @@ class ChatController:
             conversation_id,
             max(self.context_builder.history_window_size - 1, 0),
         )
+        selected_history = self.context_builder.select_history(
+            recent_messages,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
+        )
         self.conversation_controller.create_user_message(conversation_id, latest_user_turn)
         any_pattern_based_tool_fired = any(
             record.result is not None
@@ -417,7 +614,7 @@ class ChatController:
         )
         capability_status_hit = self._extract_capability_status_hit(all_tool_call_records)
         prompt_envelope = self.context_builder.build(
-            recent_messages,
+            selected_history,
             tool_call_records_to_prompt_blocks(all_tool_call_records),
             latest_user_turn=latest_user_turn,
             stage_resolution=stage_resolution,
@@ -427,9 +624,12 @@ class ChatController:
             grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
             turn_guidance_lines=turn_guidance_lines,
+            greeting_mode=greeting_mode,
             include_history_in_variable_suffix=False,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
         )
-        azure_messages = self._build_azure_messages(prompt_envelope, recent_messages)
+        azure_messages = self._build_azure_messages(prompt_envelope, selected_history)
         completion = self.azure_openai_connector.create_chat_completion(azure_messages)
         confidence_marker_emitted = CONFIDENCE_PATTERN_MARKER in completion.assistant_text
         logger.info(
@@ -439,22 +639,35 @@ class ChatController:
         )
         source_refs = collect_source_refs(all_tool_call_records)
         record_tool_calls([record.tool_name for record in all_tool_call_records])
+
+        assistant_text = completion.assistant_text
+
         if apply_output_guardrail and intent is not None:
             guardrail_result = self.output_guardrail.evaluate(
                 intent=intent,
-                assistant_text=completion.assistant_text,
+                assistant_text=assistant_text,
                 source_refs=source_refs,
                 grounding_gap_injected=grounding_gap,
                 capability_status_hit=capability_status_hit,
+                conversational_subtype=conversational_subtype,
             )
             logger.info(
                 "phase6.output_guardrail_result=%s",
                 guardrail_result,
                 extra={"phase6.output_guardrail_result": guardrail_result},
             )
+
+            # Replace response on domain leak
+            if guardrail_result == "domain_leak":
+                assistant_text = get_out_of_scope_refusal()
+                logger.info(
+                    "phase6_5.guardrail_replaced_response",
+                    extra={"reason": "domain_leak"},
+                )
+
         assistant_message = self.conversation_controller.create_assistant_message(
             conversation_id,
-            completion.assistant_text,
+            assistant_text,
             tool_calls=tool_call_records_to_storage_payload(all_tool_call_records),
             source_refs=source_refs,
         )
@@ -465,12 +678,14 @@ class ChatController:
     def _intent_to_route(intent: str) -> str:
         if intent == "rfq_specific":
             return "tools_pipeline"
-        if intent == "general_knowledge":
+        if intent == "domain_knowledge":
             return "direct_llm"
         if intent == "unsupported":
             return "capability_status"
         if intent == "disambiguation":
             return "disambiguation"
+        if intent == "out_of_scope":
+            return "deterministic_refusal"
         return "conversational"
 
     @staticmethod
@@ -693,6 +908,13 @@ class ChatController:
         )
         return any(normalized.startswith(prefix) for prefix in greeting_prefixes)
 
+    @classmethod
+    def _is_short_greeting_turn(cls, content: str) -> bool:
+        normalized = content.strip()
+        if not cls._is_greeting_turn(normalized):
+            return False
+        return len(normalized.split()) <= 3
+
     def _build_welcome_guidance_lines(
         self,
         *,
@@ -704,7 +926,7 @@ class ChatController:
             return [
                 "This is a first-turn conversational greeting in portfolio mode.",
                 "Reply with a concise, warm welcome tailored for portfolio-wide support.",
-                "Offer 1-2 concrete next actions the user can ask about across RFQs.",
+                "Keep it to 2-3 sentences and end with one simple optional question.",
             ]
 
         rfq_detail = None
@@ -717,21 +939,25 @@ class ChatController:
         client_name = getattr(rfq_detail, "client", None) if rfq_detail is not None else None
         stage_name = getattr(rfq_detail, "current_stage_name", None) if rfq_detail is not None else None
 
-        return [
+        lines = [
             "This is a first-turn conversational greeting in RFQ-bound mode.",
-            "Reply with a concise, warm welcome that acknowledges the current RFQ context.",
-            f"RFQ name: {rfq_name or 'Unavailable'}",
-            f"Client: {client_name or 'Unavailable'}",
-            f"Current stage: {stage_name or 'Unavailable'}",
-            "Offer 1-2 concrete next actions relevant to the RFQ context.",
+            "Reply with a concise, warm welcome that acknowledges the current RFQ context when available.",
+            "Keep it to 2-3 sentences, avoid analysis, and end with one simple optional question.",
         ]
+        if rfq_name:
+            lines.insert(2, f"RFQ name: {rfq_name}")
+        if client_name:
+            lines.insert(len(lines) - 1, f"Client: {client_name}")
+        if stage_name:
+            lines.insert(len(lines) - 1, f"Current stage: {stage_name}")
+        return lines
 
     @staticmethod
     def _build_follow_up_guidance_lines() -> list[str]:
         return [
-            "End the response with 1-2 contextual follow-up suggestions.",
-            "Keep follow-up suggestions grounded in retrieved RFQ facts and current stage context.",
-            "When facts are insufficient, suggest precise clarifying follow-up questions instead.",
+            "Provide at most 1-2 lightweight optional next questions.",
+            "Phrase follow-ups as optional questions, not action plans or instructions.",
+            "Only propose next questions when they are grounded in the current user request and retrieved facts.",
         ]
 
     @staticmethod

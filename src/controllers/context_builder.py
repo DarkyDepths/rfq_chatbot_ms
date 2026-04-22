@@ -2,23 +2,47 @@
 
 from __future__ import annotations
 
+import logging
+
 from src.config.prompt_templates import (
     CAPABILITY_ABSENCE_CONFIDENCE_TEMPLATE_LINES,
+    CONVERSATIONAL_RULES,
     DETERMINISTIC_CONFIDENCE_LINES,
     DISAMBIGUATION_LINES,
     DOMAIN_CONSTRAINTS_SECTION_LINES,
     DOMAIN_VOCABULARY_SECTION_LINES,
+    FORMAT_HINTS,
+    GREETING_BEHAVIOR_SECTION_LINES,
     GROUNDING_GAP_CONFIDENCE_LINES,
     GROUNDING_RULES_SECTION_LINES,
     PATTERN_BASED_CONFIDENCE_TEMPLATE_LINES,
     PERSONA_SECTION_LINES,
+    RESPONSE_FORMATTING,
     RESPONSE_RULES_SECTION_LINES,
 )
 from src.config.role_profiles import FALLBACK_ROLE, ROLE_PROFILES
 from src.models.prompt import PromptEnvelope
 
 
+logger = logging.getLogger(__name__)
+
 CONFIDENCE_PATTERN_MARKER = "Confidence: pattern-based (validated against 1 sample)"
+
+
+# ──────────────────────────────────────────────
+# History window by intent (Pack FD-7)
+# ──────────────────────────────────────────────
+HISTORY_WINDOW = {
+    "greeting": 2,
+    "identity": 2,
+    "thanks": 1,
+    "goodbye": 1,
+    "domain_knowledge": 3,
+    "rfq_specific": None,  # None = full bounded history (existing behavior)
+    "unsupported": 2,
+    "disambiguation": 3,
+    "out_of_scope": 0,  # No history needed for deterministic refusal
+}
 
 
 class ContextBuilder:
@@ -40,9 +64,18 @@ class ContextBuilder:
         grounding_gap: bool = False,
         capability_status_hit=None,
         turn_guidance_lines: list[str] | None = None,
+        greeting_mode: bool = False,
         include_history_in_variable_suffix: bool = True,
+        intent: str | None = None,
+        conversational_subtype: str | None = None,
     ) -> PromptEnvelope:
         """Return the frozen PromptEnvelope contract for the current turn."""
+
+        truncated_messages = self.select_history(
+            recent_messages,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
+        )
 
         stable_prefix = self._build_stable_prefix(
             stage_resolution=stage_resolution,
@@ -52,10 +85,13 @@ class ContextBuilder:
             grounding_gap=grounding_gap,
             capability_status_hit=capability_status_hit,
             turn_guidance_lines=turn_guidance_lines,
+            greeting_mode=greeting_mode,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
         )
 
         variable_suffix = self._build_variable_suffix(
-            recent_messages=recent_messages,
+            recent_messages=truncated_messages,
             retrieval_context_blocks=retrieval_context_blocks,
             supplemental_context_blocks=supplemental_context_blocks,
             latest_user_turn=latest_user_turn,
@@ -70,6 +106,20 @@ class ContextBuilder:
             total_budget=self.total_budget,
         )
 
+    def select_history(
+        self,
+        recent_messages,
+        *,
+        intent: str | None,
+        conversational_subtype: str | None,
+    ):
+        """Return the intent-aware history slice used for prompt assembly."""
+        return self._truncate_history(
+            recent_messages,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
+        )
+
     def _build_stable_prefix(
         self,
         *,
@@ -80,6 +130,9 @@ class ContextBuilder:
         grounding_gap: bool,
         capability_status_hit,
         turn_guidance_lines: list[str] | None,
+        greeting_mode: bool,
+        intent: str | None = None,
+        conversational_subtype: str | None = None,
     ) -> str:
         role_profile = ROLE_PROFILES[FALLBACK_ROLE]
         if role_resolution is not None and getattr(role_resolution, "profile", None):
@@ -115,33 +168,156 @@ class ContextBuilder:
         if disambiguation_context is not None:
             stage_lines.extend(DISAMBIGUATION_LINES)
 
-        prefix_sections = [
-            self._render_xml_section("persona", list(PERSONA_SECTION_LINES)),
-            self._render_xml_section(
-                "domain_constraints",
-                list(DOMAIN_CONSTRAINTS_SECTION_LINES),
-            ),
-            self._render_xml_section(
-                "domain_vocabulary",
-                list(DOMAIN_VOCABULARY_SECTION_LINES),
-            ),
-            self._render_xml_section(
-                "response_rules",
-                list(RESPONSE_RULES_SECTION_LINES),
-            ),
-            self._render_xml_section("role_framing", role_lines),
-            self._render_xml_section("stage_framing", stage_lines),
-            self._render_xml_section("confidence_behavior", confidence_directives),
-            self._render_xml_section(
-                "grounding_rules",
-                list(GROUNDING_RULES_SECTION_LINES),
-            ),
-        ]
-        if turn_guidance_lines:
-            prefix_sections.append(
-                self._render_xml_section("turn_guidance", list(turn_guidance_lines))
+        # ── Intent-aware prompt composition (FD-7 matrix) ──
+        # If intent is provided, use the matrix. Otherwise, fall back to
+        # legacy behavior (include everything) for backward compatibility.
+        if intent is not None:
+            prefix_sections = self._build_intent_aware_sections(
+                intent=intent,
+                conversational_subtype=conversational_subtype,
+                role_lines=role_lines,
+                stage_lines=stage_lines,
+                confidence_directives=confidence_directives,
+                greeting_mode=greeting_mode,
+                turn_guidance_lines=turn_guidance_lines,
             )
+        else:
+            # Legacy path: include ALL sections (backward compatibility)
+            prefix_sections = [
+                self._render_xml_section("persona", list(PERSONA_SECTION_LINES)),
+                self._render_xml_section(
+                    "domain_constraints",
+                    list(DOMAIN_CONSTRAINTS_SECTION_LINES),
+                ),
+                self._render_xml_section(
+                    "domain_vocabulary",
+                    list(DOMAIN_VOCABULARY_SECTION_LINES),
+                ),
+                self._render_xml_section(
+                    "response_rules",
+                    list(RESPONSE_RULES_SECTION_LINES),
+                ),
+                self._render_xml_section(
+                    "greeting_behavior",
+                    list(GREETING_BEHAVIOR_SECTION_LINES),
+                ),
+                self._render_xml_section("role_framing", role_lines),
+                self._render_xml_section("stage_framing", stage_lines),
+                self._render_xml_section("confidence_behavior", confidence_directives),
+                self._render_xml_section(
+                    "grounding_rules",
+                    list(GROUNDING_RULES_SECTION_LINES),
+                ),
+            ]
+            if greeting_mode:
+                prefix_sections.append(self._render_xml_section("turn_mode", ["greeting"]))
+            if turn_guidance_lines:
+                prefix_sections.append(
+                    self._render_xml_section("turn_guidance", list(turn_guidance_lines))
+                )
+
         return "\n\n".join(prefix_sections)
+
+    def _build_intent_aware_sections(
+        self,
+        *,
+        intent: str,
+        conversational_subtype: str | None,
+        role_lines: list[str],
+        stage_lines: list[str],
+        confidence_directives: list[str],
+        greeting_mode: bool,
+        turn_guidance_lines: list[str] | None,
+    ) -> list[str]:
+        """Build prefix sections based on the FD-7 intent inclusion matrix."""
+        sections: list[str] = []
+
+        # Always include persona
+        sections.append(self._render_xml_section("persona", list(PERSONA_SECTION_LINES)))
+
+        # Domain constraints: for greeting, domain_knowledge, rfq_specific, unsupported
+        if intent in ("domain_knowledge", "rfq_specific", "unsupported"):
+            sections.append(
+                self._render_xml_section("domain_constraints", list(DOMAIN_CONSTRAINTS_SECTION_LINES))
+            )
+        elif intent == "conversational" and conversational_subtype in ("greeting", "chitchat", None):
+            sections.append(
+                self._render_xml_section("domain_constraints", list(DOMAIN_CONSTRAINTS_SECTION_LINES))
+            )
+
+        # Domain vocabulary: include for domain_knowledge and rfq_specific
+        if intent in ("domain_knowledge", "rfq_specific"):
+            sections.append(
+                self._render_xml_section("domain_vocabulary", list(DOMAIN_VOCABULARY_SECTION_LINES))
+            )
+
+        # Response rules: FULL for domain_knowledge and rfq_specific, LITE for others
+        if intent in ("domain_knowledge", "rfq_specific"):
+            sections.append(
+                self._render_xml_section("response_rules", list(RESPONSE_RULES_SECTION_LINES))
+            )
+        else:
+            sections.append(self._lite_response_rules_section())
+
+        # Greeting behavior: ONLY for greeting subtype
+        if intent == "conversational" and conversational_subtype == "greeting":
+            sections.append(
+                self._render_xml_section("greeting_behavior", list(GREETING_BEHAVIOR_SECTION_LINES))
+            )
+
+        # Conversational rules: for conversational intents EXCEPT greeting (which has its own)
+        if intent == "conversational" and conversational_subtype != "greeting":
+            sections.append(CONVERSATIONAL_RULES)
+
+        # Response formatting: for domain_knowledge and rfq_specific only
+        if intent in ("domain_knowledge", "rfq_specific"):
+            sections.append(RESPONSE_FORMATTING)
+
+        # Role framing: ONLY for rfq_specific
+        if intent == "rfq_specific":
+            sections.append(self._render_xml_section("role_framing", role_lines))
+
+        # Stage framing: ONLY for rfq_specific
+        if intent == "rfq_specific":
+            sections.append(self._render_xml_section("stage_framing", stage_lines))
+
+        # Disambiguation mode relies on explicit disambiguation directives in the stable prefix.
+        if intent == "disambiguation":
+            sections.append(self._render_xml_section("stage_framing", stage_lines))
+
+        # Confidence behavior: rfq_specific plus unsupported capability-status mode.
+        if intent in ("rfq_specific", "unsupported"):
+            sections.append(self._render_xml_section("confidence_behavior", confidence_directives))
+
+        # Grounding rules: ONLY for rfq_specific
+        if intent == "rfq_specific":
+            sections.append(
+                self._render_xml_section("grounding_rules", list(GROUNDING_RULES_SECTION_LINES))
+            )
+
+        # Turn mode
+        if greeting_mode:
+            sections.append(self._render_xml_section("turn_mode", ["greeting"]))
+
+        # Turn guidance with format hint
+        if turn_guidance_lines:
+            guidance = list(turn_guidance_lines)
+            # Add format hint
+            format_key = conversational_subtype if intent == "conversational" else intent
+            format_hint = FORMAT_HINTS.get(format_key, "plain_prose_short")
+            guidance.append(f"<format_hint>{format_hint}</format_hint>")
+            sections.append(self._render_xml_section("turn_guidance", guidance))
+
+        return sections
+
+    @staticmethod
+    def _lite_response_rules_section() -> str:
+        """Return a stripped-down response rules section — only the 3 core rules."""
+        return """<response_rules>
+- Lead with the answer, not the process.
+- Be concise — match response depth to what the user asked.
+- Do not proactively expand beyond the question.
+</response_rules>"""
 
     @staticmethod
     def _render_xml_section(tag: str, lines: list[str]) -> str:
@@ -222,3 +398,15 @@ class ContextBuilder:
         if include_history:
             transcript_lines.append("assistant:")
         return "\n".join(transcript_lines)
+
+    @staticmethod
+    def _truncate_history(recent_messages, *, intent: str | None, conversational_subtype: str | None):
+        """Apply intent-based history truncation."""
+        if intent is None:
+            return recent_messages
+
+        history_key = conversational_subtype if intent == "conversational" else intent
+        max_turns = HISTORY_WINDOW.get(history_key, 3)
+        if max_turns is not None and len(recent_messages) > max_turns:
+            return recent_messages[-max_turns:]
+        return recent_messages

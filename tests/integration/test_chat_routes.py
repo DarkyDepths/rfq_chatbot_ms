@@ -183,7 +183,8 @@ def test_first_turn_creates_conversation_and_persists_messages(client, app):
         assert response.status_code == 200
         assert payload["conversation_id"]
         assert payload["role"] == "assistant"
-        assert payload["content"] == "assistant-response-1"
+        assert payload["content"] == "Hi! I'm RFQ Copilot. How can I help with your RFQs?"
+        assert len(fake_azure.calls) == 0
 
         readback = client.get(
             f"/rfq-chatbot/v1/conversations/{payload['conversation_id']}"
@@ -208,11 +209,11 @@ def test_second_turn_reuses_conversation_and_history(client, app):
 
         first_turn = client.post(
             f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-            json={"content": "First question"},
+            json={"content": "what is PWHT?"},
         )
         second_turn = client.post(
             f"/rfq-chatbot/v1/sessions/{session_id}/turn",
-            json={"content": "Second question"},
+            json={"content": "how does RT work?"},
         )
 
         assert first_turn.status_code == 200
@@ -227,9 +228,9 @@ def test_second_turn_reuses_conversation_and_history(client, app):
         history = readback.json()["messages"]
 
         assert [message["content"] for message in history] == [
-            "First question",
+            "what is PWHT?",
             "assistant-response-1",
-            "Second question",
+            "how does RT work?",
             "assistant-response-2",
         ]
     finally:
@@ -275,10 +276,10 @@ def test_turn_with_manager_backed_retrieval_returns_grounded_answer(client, app)
         )
 
         assert response.status_code == 200
-        assert response.json()["content"] == (
-            "The RFQ owner is Sarah and the deadline is 2026-05-01."
-        )
+        assert "Sarah" in response.json()["content"]
+        assert "2026-05-01" in response.json()["content"]
         assert response.json()["source_refs"][0]["system"] == "rfq_manager_ms"
+        assert len(fake_azure.calls) == 0
 
         readback = client.get(
             f"/rfq-chatbot/v1/conversations/{response.json()['conversation_id']}"
@@ -305,13 +306,16 @@ def test_turn_with_intelligence_backed_retrieval_returns_grounded_answer(client,
         )
 
         assert response.status_code == 200
-        assert response.json()["content"] == (
-            "The current RFQ snapshot is partial and intelligence briefing is available."
-        )
+        content = response.json()["content"]
+        assert "Boiler Upgrade" in content
+        assert "Acme Industrial" in content
+        assert "partial" in content.lower()
+        assert "briefing" in content.lower()
         assert any(
             source_ref["system"] == "rfq_intelligence_ms"
             for source_ref in response.json()["source_refs"]
         )
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase4_dependencies(app)
 
@@ -337,8 +341,12 @@ def test_downstream_failure_is_surfaced_explicitly(client, app):
         )
 
         assert response.status_code == 200
-        assert response.json()["source_refs"]
-        assert response.json()["source_refs"][0]["system"] == "rfq_intelligence_ms"
+        assert response.json()["source_refs"] == []
+        content = response.json()["content"].lower()
+        assert "don't have grounded" in content
+        assert "owner" in content
+        assert "deadline" in content
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase4_dependencies(app)
 

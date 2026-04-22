@@ -27,6 +27,12 @@ class ObservabilityAzureConnector:
     def create_chat_completion(self, messages, tools=None):
         self.calls.append({"messages": messages, "tools": tools})
         stable_prefix = messages[0]["content"]
+        latest_user_turn = messages[-1]["content"].lower()
+
+        if "Domain scope recheck mode: classification only." in stable_prefix:
+            if "brown field" in latest_user_turn:
+                return ChatCompletionResult(assistant_text="definitely_relevant")
+            return ChatCompletionResult(assistant_text="not_relevant")
 
         if "Disambiguation behavior: RFQ resolution mode." in stable_prefix:
             return ChatCompletionResult(
@@ -165,7 +171,7 @@ def test_observability_rfq_specific_emits_phase5_and_phase6_fields(client, app, 
         _clear_dependencies(app)
 
 
-def test_observability_general_knowledge_has_no_stage_tool_or_grounding_fields(client, app, caplog):
+def test_observability_domain_knowledge_has_no_stage_tool_or_grounding_fields(client, app, caplog):
     fake_azure = ObservabilityAzureConnector()
     manager = ObservabilityManagerConnector()
     intelligence = ObservabilityIntelligenceConnector()
@@ -186,14 +192,46 @@ def test_observability_general_knowledge_has_no_stage_tool_or_grounding_fields(c
             )
 
         assert response.status_code == 200
-        assert _log_values(caplog, "phase6.intent_classified")[-1] == "general_knowledge"
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "direct_llm"
         assert _log_values(caplog, "phase5.stage_resolved") == []
         assert _log_values(caplog, "phase5.tools_keyword_matched") == []
         assert _log_values(caplog, "phase5.tools_allowed_after_stage") == []
         assert _log_values(caplog, "phase5.tools_allowed_after_role") == []
+        assert _log_values(caplog, "phase6.domain_recheck_invoked") == []
+        assert _log_values(caplog, "phase6.domain_recheck_label") == []
+        assert _log_values(caplog, "phase6.domain_recheck_final_intent") == []
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert _log_values(caplog, "phase6.grounding_satisfied") == []
+    finally:
+        _clear_dependencies(app)
+
+
+def test_observability_semantic_recheck_emits_fallback_fields(client, app, caplog):
+    fake_azure = ObservabilityAzureConnector()
+    manager = ObservabilityManagerConnector()
+    intelligence = ObservabilityIntelligenceConnector()
+    _override_dependencies(
+        app,
+        azure_connector=fake_azure,
+        manager_connector=manager,
+        intelligence_connector=intelligence,
+    )
+
+    try:
+        session_id = _create_session(client, mode="global")
+
+        with caplog.at_level(logging.INFO):
+            response = client.post(
+                f"/rfq-chatbot/v1/sessions/{session_id}/turn",
+                json={"content": "brown field and green field what do they mean"},
+            )
+
+        assert response.status_code == 200
+        assert _log_values(caplog, "phase6.intent_classified")[-1] == "domain_knowledge"
+        assert _log_values(caplog, "phase6.domain_recheck_invoked")[-1] is True
+        assert _log_values(caplog, "phase6.domain_recheck_label")[-1] == "definitely_relevant"
+        assert _log_values(caplog, "phase6.domain_recheck_final_intent")[-1] == "domain_knowledge"
     finally:
         _clear_dependencies(app)
 
@@ -256,7 +294,7 @@ def test_observability_disambiguation_resolution_emits_resolved_field(client, ap
         _clear_dependencies(app)
 
 
-def test_observability_conversational_has_no_guardrail_result(client, app, caplog):
+def test_observability_conversational_has_guardrail_pass(client, app, caplog):
     fake_azure = ObservabilityAzureConnector()
     manager = ObservabilityManagerConnector()
     intelligence = ObservabilityIntelligenceConnector()
@@ -280,5 +318,6 @@ def test_observability_conversational_has_no_guardrail_result(client, app, caplo
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
         assert _log_values(caplog, "phase6.output_guardrail_result") == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_dependencies(app)
