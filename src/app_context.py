@@ -11,6 +11,7 @@ from src.controllers.chat_controller import ChatController
 from src.controllers.context_builder import ContextBuilder
 from src.controllers.conversation_controller import ConversationController
 from src.controllers.disambiguation_controller import DisambiguationController
+from src.controllers.domain_scope_recheck_controller import DomainScopeRecheckController
 from src.controllers.intent_controller import IntentController
 from src.controllers.mode_controller import ModeController
 from src.controllers.role_controller import RoleController
@@ -81,6 +82,14 @@ def get_azure_openai_connector() -> AzureOpenAIConnector:
     return AzureOpenAIConnector()
 
 
+def get_domain_scope_recheck_controller(
+    azure_openai_connector: AzureOpenAIConnector = Depends(get_azure_openai_connector),
+) -> DomainScopeRecheckController:
+    """Build the semantic domain-scope recheck controller for the current request."""
+
+    return DomainScopeRecheckController(azure_openai_connector=azure_openai_connector)
+
+
 def get_manager_connector() -> ManagerConnector:
     """Build the Phase 4 manager connector."""
 
@@ -119,10 +128,16 @@ def get_role_controller() -> RoleController:
     return RoleController()
 
 
-def get_intent_controller() -> IntentController:
+def get_intent_controller(
+    domain_scope_recheck_controller: DomainScopeRecheckController = Depends(
+        get_domain_scope_recheck_controller
+    ),
+) -> IntentController:
     """Build the Phase 6 deterministic intent controller."""
 
-    return IntentController()
+    return IntentController(
+        domain_scope_recheck_controller=domain_scope_recheck_controller
+    )
 
 
 def get_disambiguation_controller() -> DisambiguationController:

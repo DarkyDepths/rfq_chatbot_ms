@@ -8,7 +8,7 @@ from src.app_context import (
     get_manager_connector,
 )
 from src.config.capability_status import CAPABILITY_STATUS_ENTRIES
-from src.config.stage_profiles import DEFAULT_STAGE_PROFILE, STAGE_PROFILES
+from src.config.stage_profiles import STAGE_PROFILES
 from src.connectors.azure_openai_connector import ChatCompletionResult
 from src.connectors.intelligence_connector import (
     IntelligenceSnapshotArtifact,
@@ -213,7 +213,7 @@ def _log_values(caplog, field_name):
     return [record.__dict__[field_name] for record in caplog.records if field_name in record.__dict__]
 
 
-def test_phase5_scenario_1_role_contrast_same_rfq(client, app, caplog):
+def test_phase5_scenario_1_role_observability_same_rfq(client, app, caplog):
     fake_azure = EchoAzureOpenAIConnector()
     manager = ScenarioManagerConnector()
     intelligence = ScenarioIntelligenceConnector()
@@ -255,16 +255,19 @@ def test_phase5_scenario_1_role_contrast_same_rfq(client, app, caplog):
         assert lead_response.status_code == 200
         assert executive_response.status_code == 200
         assert lead_payload["source_refs"] == executive_payload["source_refs"]
-        assert lead_payload["content"] != executive_payload["content"]
+        assert lead_payload["content"] == executive_payload["content"]
+        assert "Sarah" in lead_payload["content"]
+        assert "2026-05-01" in lead_payload["content"]
 
         role_values = _log_values(caplog, "phase5.role_applied")
         assert "estimation_dept_lead" in role_values
         assert "executive" in role_values
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase5_dependencies(app)
 
 
-def test_phase5_scenario_2_stage_contrast_same_question(client, app, caplog):
+def test_phase5_scenario_2_stage_resolution_observability_same_question(client, app, caplog):
     fake_azure = EchoAzureOpenAIConnector()
     unknown_stage_id = uuid.uuid4()
     while unknown_stage_id in STAGE_PROFILES:
@@ -314,18 +317,18 @@ def test_phase5_scenario_2_stage_contrast_same_question(client, app, caplog):
         stage_values = _log_values(caplog, "phase5.stage_resolved")
         assert "success" in stage_values
         assert "default_profile_applied" in stage_values
-
-        known_prefix = fake_azure.calls[0]["stable_prefix"]
-        unknown_prefix = fake_azure.calls[1]["stable_prefix"]
-        assert known_prefix != unknown_prefix
-        assert "Stage framing:" in known_prefix
-        assert "Stage framing:" in unknown_prefix
-        assert DEFAULT_STAGE_PROFILE["prompt_frame_fragment"] in unknown_prefix
+        assert "Sarah" in known_response.json()["content"]
+        assert "2026-05-01" in known_response.json()["content"]
+        assert "Sarah" in unknown_response.json()["content"]
+        assert "2026-05-01" in unknown_response.json()["content"]
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase5_dependencies(app)
 
 
-def test_phase5_scenario_3_confidence_marker_presence_and_absence(client, app, caplog):
+def test_phase5_scenario_3_deterministic_rfq_answers_do_not_emit_confidence_markers(
+    client, app, caplog
+):
     fake_azure = EchoAzureOpenAIConnector()
     manager = ScenarioManagerConnector()
     intelligence = ScenarioIntelligenceConnector()
@@ -352,12 +355,15 @@ def test_phase5_scenario_3_confidence_marker_presence_and_absence(client, app, c
         assert snapshot_response.status_code == 200
         assert profile_response.status_code == 200
 
-        assert CONFIDENCE_PATTERN_MARKER in snapshot_response.json()["content"]
+        assert CONFIDENCE_PATTERN_MARKER not in snapshot_response.json()["content"]
         assert CONFIDENCE_PATTERN_MARKER not in profile_response.json()["content"]
+        assert "partial" in snapshot_response.json()["content"].lower()
+        assert "Sarah" in profile_response.json()["content"]
 
         marker_values = _log_values(caplog, "phase5.confidence_marker_emitted")
-        assert True in marker_values
-        assert False in marker_values
+        assert marker_values
+        assert all(value is False for value in marker_values)
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase5_dependencies(app)
 
@@ -448,8 +454,10 @@ def test_phase5_scenario_6_graceful_degradation_on_stage_resolution_failure(
 
         assert response.status_code == 200
         assert "upstream_service_error" in _log_values(caplog, "phase5.stage_resolved")
-
-        stable_prefix = fake_azure.calls[-1]["stable_prefix"]
-        assert DEFAULT_STAGE_PROFILE["prompt_frame_fragment"] in stable_prefix
+        content = response.json()["content"].lower()
+        assert "don't have grounded" in content
+        assert "deadline" in content
+        assert response.json()["source_refs"] == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_phase5_dependencies(app)

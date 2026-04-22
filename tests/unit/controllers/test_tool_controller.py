@@ -276,6 +276,42 @@ def test_keyword_match_surviving_both_gates_executes_selected_tool():
     assert manager.get_rfq_stages_calls == 0
 
 
+def test_current_details_about_this_rfq_routes_to_snapshot_tool():
+    controller, manager, intelligence = _build_controller()
+    session = _session(str(uuid.uuid4()))
+
+    tool_calls = controller.maybe_execute_retrieval(
+        session,
+        "what is the current details about this rfq",
+        stage_profile=DEFAULT_STAGE_PROFILE,
+        role_profile=ROLE_PROFILES["estimation_dept_lead"],
+    )
+
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_name == "get_rfq_snapshot"
+    assert intelligence.get_snapshot_calls == 1
+    assert manager.get_rfq_calls == 0
+    assert manager.get_rfq_stages_calls == 0
+
+
+def test_current_information_about_this_rfq_routes_to_snapshot_tool():
+    controller, manager, intelligence = _build_controller()
+    session = _session(str(uuid.uuid4()))
+
+    tool_calls = controller.maybe_execute_retrieval(
+        session,
+        "what is the current information about this rfq",
+        stage_profile=DEFAULT_STAGE_PROFILE,
+        role_profile=ROLE_PROFILES["estimation_dept_lead"],
+    )
+
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_name == "get_rfq_snapshot"
+    assert intelligence.get_snapshot_calls == 1
+    assert manager.get_rfq_calls == 0
+    assert manager.get_rfq_stages_calls == 0
+
+
 def test_multiple_tool_families_surviving_gates_raises_ambiguous_422():
     controller, _, _ = _build_controller()
     session = _session(str(uuid.uuid4()))

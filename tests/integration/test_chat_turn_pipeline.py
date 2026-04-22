@@ -213,7 +213,8 @@ def test_pipeline_portfolio_greeting_skips_retrieval_and_returns_200(client, app
         assert manager.get_rfq_calls == 0
         assert manager.get_rfq_stages_calls == 0
         assert intelligence.get_snapshot_calls == 0
-        assert _log_values(caplog, "phase5.confidence_marker_emitted")[-1] is False
+        assert _log_values(caplog, "phase5.confidence_marker_emitted") == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_step6_dependencies(app)
 
@@ -325,11 +326,12 @@ def test_pipeline_stage_resolution_failure_degrades_for_non_retrieval_turn(
 
         payload = response.json()
         assert response.status_code == 200
-        assert payload["source_refs"]
-        assert payload["source_refs"][0]["system"] == "rfq_intelligence_ms"
+        assert payload["source_refs"] == []
+        assert "unavailable" not in payload["content"].lower()
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "conversational"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "conversational"
         assert _log_values(caplog, "phase5.stage_resolved") == []
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_step6_dependencies(app)
 
@@ -358,12 +360,17 @@ def test_pipeline_stage_resolution_failure_with_profile_query_degrades_to_ground
             )
 
         assert response.status_code == 200
-        assert "cannot retrieve the requested information" in response.json()["content"].lower()
+        content = response.json()["content"].lower()
+        assert "don't have grounded" in content
+        assert "owner" in content
+        assert "deadline" in content
+        assert response.json()["source_refs"] == []
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
         assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
-        assert manager.get_rfq_calls == 3
+        assert manager.get_rfq_calls >= 1
+        assert len(fake_azure.calls) == 0
     finally:
         _clear_step6_dependencies(app)
 

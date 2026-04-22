@@ -39,8 +39,19 @@ class OutputGuardrail:
                 return "domain_leak"
             return "pass"
 
-        # Conversational: soft length checks
+        # Conversational: off-domain leak check (hard) + soft length checks
         if intent == "conversational":
+            # Hard check: if the LLM generated off-domain content, treat as domain leak
+            if response_contains_off_domain_content(assistant_text):
+                logger.warning(
+                    "phase6_5.guardrail_conversational_domain_leak",
+                    extra={
+                        "intent": intent,
+                        "subtype": conversational_subtype,
+                        "response_preview": assistant_text[:100],
+                    },
+                )
+                return "domain_leak"
             if conversational_subtype == "greeting" and len(assistant_text) > 500:
                 logger.warning(
                     "phase6_5.guardrail_verbose_greeting",

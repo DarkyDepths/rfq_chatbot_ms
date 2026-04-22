@@ -8,6 +8,7 @@ from src.config.intent_patterns import (
     classify_conversational_subtype,
     get_out_of_scope_refusal,
     message_contains_domain_term,
+    message_is_knowledge_like_turn,
     response_contains_off_domain_content,
     OUT_OF_SCOPE_REFUSALS,
 )
@@ -80,6 +81,42 @@ def test_message_contains_domain_term_purchase_order():
     assert message_contains_domain_term("explain purchase order") is True
 
 
+def test_message_contains_domain_term_rejects_weak_household_material_context():
+    assert message_contains_domain_term(
+        "what stainless steel should I use for my home sink?"
+    ) is False
+
+
+def test_message_contains_domain_term_rejects_weak_household_component_context():
+    assert message_contains_domain_term(
+        "can you help me pick a valve for my garden hose?"
+    ) is False
+
+
+def test_message_contains_domain_term_accepts_strong_domain_signal_with_weak_term():
+    assert message_contains_domain_term(
+        "what stainless steel grade is typical for ASME Section VIII vessels?"
+    ) is True
+
+
+def test_message_is_knowledge_like_turn_handles_informal_entity_question():
+    assert message_is_knowledge_like_turn("do u know about aramco?") is True
+
+
+def test_message_is_knowledge_like_turn_handles_meaning_question():
+    assert message_is_knowledge_like_turn(
+        "brown field and green field what do they mean"
+    ) is True
+
+
+def test_message_is_knowledge_like_turn_handles_general_question_form():
+    assert message_is_knowledge_like_turn("what's aramco?") is True
+
+
+def test_message_is_knowledge_like_turn_rejects_plain_statement():
+    assert message_is_knowledge_like_turn("please review the attached sheet") is False
+
+
 # ──────────────────────────────────────────────
 # Phase 6.5: Conversational sub-type tests
 # ──────────────────────────────────────────────
@@ -98,6 +135,18 @@ def test_classify_conversational_subtype_thanks():
 
 def test_classify_conversational_subtype_generic():
     assert classify_conversational_subtype("random question here") == "generic"
+
+
+def test_classify_conversational_subtype_uses_phrase_boundaries():
+    assert classify_conversational_subtype("which option is better?") != "greeting"
+    assert classify_conversational_subtype("this seems wrong") != "greeting"
+    assert classify_conversational_subtype("what do you think?") != "greeting"
+
+
+def test_classify_conversational_subtype_reset_variants():
+    assert classify_conversational_subtype("never mind") == "reset"
+    assert classify_conversational_subtype("reset") == "reset"
+    assert classify_conversational_subtype("start over") == "reset"
 
 
 # ──────────────────────────────────────────────
@@ -123,3 +172,32 @@ def test_response_contains_off_domain_with_pwht():
     assert response_contains_off_domain_content(
         "PWHT is a post-weld heat treatment process used in fabrication"
     ) is False
+
+
+# ──────────────────────────────────────────────
+# Phase 6.5 regression: off-domain indicator coverage
+# ──────────────────────────────────────────────
+
+def test_message_off_domain_sport():
+    from src.config.intent_patterns import message_contains_off_domain_indicator
+    assert message_contains_off_domain_indicator("how to play sport") is True
+
+
+def test_message_off_domain_pasta():
+    from src.config.intent_patterns import message_contains_off_domain_indicator
+    assert message_contains_off_domain_indicator("how to cook pasta") is True
+
+
+def test_message_off_domain_pizza():
+    from src.config.intent_patterns import message_contains_off_domain_indicator
+    assert message_contains_off_domain_indicator("and what about making pizza?") is True
+
+
+def test_message_off_domain_crepes():
+    from src.config.intent_patterns import message_contains_off_domain_indicator
+    assert message_contains_off_domain_indicator("crepes recipe please") is True
+
+
+def test_message_off_domain_does_not_fire_on_rfq():
+    from src.config.intent_patterns import message_contains_off_domain_indicator
+    assert message_contains_off_domain_indicator("what is the rfq deadline?") is False

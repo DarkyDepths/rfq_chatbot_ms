@@ -218,3 +218,55 @@ def test_out_of_scope_always_passes():
     )
 
     assert result == "pass"
+
+
+# ──────────────────────────────────────────────
+# Phase 6.5 regression: conversational off-domain leak detection
+# ──────────────────────────────────────────────
+
+def test_conversational_with_recipe_content_is_domain_leak():
+    """If LLM generates a recipe in conversational mode, guardrail must catch it."""
+    guardrail = OutputGuardrail()
+
+    result = guardrail.evaluate(
+        intent="conversational",
+        assistant_text="Here's a great pasta recipe with flour and olive oil ingredients...",
+        source_refs=[],
+        grounding_gap_injected=False,
+        capability_status_hit=None,
+        conversational_subtype="generic",
+    )
+
+    assert result == "domain_leak"
+
+
+def test_conversational_with_sport_advice_is_domain_leak():
+    """If LLM generates sports advice in conversational mode, guardrail must catch it."""
+    guardrail = OutputGuardrail()
+
+    result = guardrail.evaluate(
+        intent="conversational",
+        assistant_text="To play football, you need a ball and exercise regularly at the gym.",
+        source_refs=[],
+        grounding_gap_injected=False,
+        capability_status_hit=None,
+        conversational_subtype="generic",
+    )
+
+    assert result == "domain_leak"
+
+
+def test_conversational_greeting_without_off_domain_passes():
+    """Normal greeting responses must not trigger domain leak."""
+    guardrail = OutputGuardrail()
+
+    result = guardrail.evaluate(
+        intent="conversational",
+        assistant_text="Hi! I'm ready to help with your RFQ. What would you like to check?",
+        source_refs=[],
+        grounding_gap_injected=False,
+        capability_status_hit=None,
+        conversational_subtype="greeting",
+    )
+
+    assert result == "pass"

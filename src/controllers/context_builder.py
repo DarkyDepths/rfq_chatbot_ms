@@ -71,9 +71,10 @@ class ContextBuilder:
     ) -> PromptEnvelope:
         """Return the frozen PromptEnvelope contract for the current turn."""
 
-        # Apply intent-based history truncation
-        truncated_messages = self._truncate_history(
-            recent_messages, intent=intent, conversational_subtype=conversational_subtype,
+        truncated_messages = self.select_history(
+            recent_messages,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
         )
 
         stable_prefix = self._build_stable_prefix(
@@ -103,6 +104,20 @@ class ContextBuilder:
             stable_prefix=stable_prefix,
             variable_suffix=variable_suffix,
             total_budget=self.total_budget,
+        )
+
+    def select_history(
+        self,
+        recent_messages,
+        *,
+        intent: str | None,
+        conversational_subtype: str | None,
+    ):
+        """Return the intent-aware history slice used for prompt assembly."""
+        return self._truncate_history(
+            recent_messages,
+            intent=intent,
+            conversational_subtype=conversational_subtype,
         )
 
     def _build_stable_prefix(

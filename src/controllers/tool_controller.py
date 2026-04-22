@@ -76,6 +76,18 @@ class ToolController:
         "rfq status",
         "status of this rfq",
     )
+    snapshot_currentness_keywords = ("current", "currently", "present", "latest")
+    snapshot_detail_keywords = (
+        "detail",
+        "details",
+        "info",
+        "information",
+        "facts",
+        "known",
+        "snapshot",
+    )
+    snapshot_rfq_referent_keywords = ("this rfq", "the rfq", "rfq")
+
     def __init__(
         self,
         manager_connector: ManagerConnector,
@@ -161,7 +173,7 @@ class ToolController:
                 )
             )
 
-        if any(keyword in normalized for keyword in self.snapshot_keywords):
+        if self._matches_snapshot_request(normalized):
             candidate_plans.append(
                 RetrievalPlan(
                     tool_name="get_rfq_snapshot",
@@ -212,6 +224,24 @@ class ToolController:
             return role_filtered_plans[0]
 
         return None
+
+    def _matches_snapshot_request(self, normalized_user_content: str) -> bool:
+        if any(keyword in normalized_user_content for keyword in self.snapshot_keywords):
+            return True
+
+        has_rfq_referent = any(
+            keyword in normalized_user_content
+            for keyword in self.snapshot_rfq_referent_keywords
+        )
+        has_currentness = any(
+            keyword in normalized_user_content
+            for keyword in self.snapshot_currentness_keywords
+        )
+        has_detail_intent = any(
+            keyword in normalized_user_content
+            for keyword in self.snapshot_detail_keywords
+        )
+        return has_rfq_referent and has_currentness and has_detail_intent
 
     @staticmethod
     def _log_phase5_field(field_name: str, value) -> None:

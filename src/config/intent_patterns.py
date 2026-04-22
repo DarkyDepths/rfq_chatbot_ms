@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 import random
 import re
 from typing import TypedDict
@@ -92,32 +93,97 @@ DOMAIN_VOCAB_TIER2 = {
     "abqaiq", "jazan", "neom", "saudi vision 2030", "iktva",
 }
 
-# Combined set for fast lookup
+# Weak household-adjacent terms are tracked separately so they do not
+# reopen positive domain admission by themselves.
+WEAK_DOMAIN_SIGNALS = {
+    "carbon steel",
+    "stainless steel",
+    "alloy steel",
+    "duplex",
+    "super duplex",
+    "inconel",
+    "monel",
+    "hastelloy",
+    "titanium",
+    "valve",
+    "gate valve",
+    "globe valve",
+    "ball valve",
+    "check valve",
+    "butterfly valve",
+}
+
+# Combined set for fast lookup and prompt-facing vocabulary.
 DOMAIN_VOCABULARY = DOMAIN_VOCAB_TIER1 | DOMAIN_VOCAB_TIER2
+STRONG_DOMAIN_SIGNALS = DOMAIN_VOCABULARY - WEAK_DOMAIN_SIGNALS
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+@lru_cache(maxsize=None)
+def _compiled_phrase_pattern(phrase: str) -> re.Pattern[str]:
+    escaped_phrase = re.escape(_normalize_text(phrase)).replace(r"\ ", r"\s+")
+    return re.compile(rf"\b{escaped_phrase}\b")
+
+
+def _text_contains_phrase(text: str, phrase: str) -> bool:
+    return _compiled_phrase_pattern(phrase).search(text) is not None
+
+
+def _message_contains_any_term(message: str, terms: set[str]) -> bool:
+    normalized_message = _normalize_text(message)
+    return any(_text_contains_phrase(normalized_message, term) for term in terms)
 
 
 def message_contains_domain_term(message: str) -> bool:
-    """Check if user message contains at least one domain vocabulary term.
-    Uses word-boundary matching for short terms, substring for multi-word terms.
-    """
-    text = message.lower()
-    for term in DOMAIN_VOCABULARY:
-        if " " in term:
-            # Multi-word term: substring match
-            if term in text:
-                return True
-        else:
-            # Single-word term: word boundary match to avoid false positives
-            # e.g., "head" shouldn't match "heading" in casual context
-            if len(term) <= 3:
-                # Very short terms (rt, ut, nb, mr, etc.): require word boundaries
-                if re.search(rf'\b{re.escape(term)}\b', text):
-                    return True
-            else:
-                # Longer single words: substring is safe enough
-                if term in text:
-                    return True
-    return False
+    """Check whether a message contains a strong in-domain signal."""
+    return _message_contains_any_term(message, STRONG_DOMAIN_SIGNALS)
+
+
+KNOWLEDGE_LIKE_CUES = (
+    "what is",
+    "what are",
+    "what does",
+    "what do",
+    "how does",
+    "how do",
+    "explain",
+    "describe",
+    "tell me about",
+    "can you explain",
+    "do you know about",
+    "do u know about",
+    "define",
+    "meaning of",
+    "difference between",
+    "compare",
+    "in general",
+    "typical",
+)
+KNOWLEDGE_LIKE_QUESTION_STARTERS = frozenset(
+    {"what", "how", "why", "which", "who", "when", "where", "can", "do"}
+)
+
+
+def message_is_knowledge_like_turn(message: str) -> bool:
+    """Check whether a turn reads like a concept/explanation question."""
+    normalized_message = _normalize_text(message)
+    if not normalized_message:
+        return False
+
+    if any(
+        _text_contains_phrase(normalized_message, cue)
+        for cue in KNOWLEDGE_LIKE_CUES
+    ):
+        return True
+
+    tokens = re.findall(r"[a-z0-9]+", normalized_message)
+    if not tokens:
+        return False
+
+    return "?" in message and tokens[0] in KNOWLEDGE_LIKE_QUESTION_STARTERS
 
 
 # ──────────────────────────────────────────────
@@ -148,7 +214,7 @@ CONVERSATIONAL_SUBTYPES = {
         "let me rephrase", "i meant", "what i mean is", "to clarify",
     ],
     "reset": [
-        "never mind", "forget it", "start over", "scratch that",
+        "never mind", "reset", "forget it", "start over", "scratch that",
         "ignore that", "disregard",
     ],
     "repeat": [
@@ -166,10 +232,10 @@ def classify_conversational_subtype(message: str) -> str:
     """Classify a conversational message into a sub-type.
     Returns the sub-type key or 'generic' if no match.
     """
-    text = message.lower().strip()
+    text = _normalize_text(message)
     for subtype, patterns in CONVERSATIONAL_SUBTYPES.items():
         for pattern in patterns:
-            if pattern in text:
+            if _text_contains_phrase(text, pattern):
                 return subtype
     return "generic"
 
@@ -206,14 +272,29 @@ def get_out_of_scope_refusal() -> str:
 # ──────────────────────────────────────────────
 
 OFF_DOMAIN_INDICATORS = [
+    # Food & cooking
     "recipe", "ingredient", "cooking", "baking", "bread", "cake",
+    "pasta", "pizza", "crepe", "crepes", "pancake", "soup", "salad",
+    "cook ", "bake ", "fry ", "roast", "grill", "oven", "kitchen",
+    "flour", "dough", "yeast", "butter", "sugar", "spice",
+    # Travel
     "travel", "vacation", "hotel", "flight", "tourist",
+    # Entertainment
     "movie", "film", "song", "lyrics", "album", "actor",
-    "game", "score", "team", "league", "championship",
+    "netflix", "youtube", "spotify", "playlist",
+    # Sports
+    "sport", "football", "soccer", "basketball", "tennis",
+    "cricket", "baseball", "swimming", "gym", "marathon",
+    "game score", "championship", "league", "tournament",
+    # Education (non-industrial)
     "homework", "essay", "school", "exam", "quiz",
+    # Health & fitness
     "diet", "exercise", "workout", "calories", "weight loss",
+    # Misc non-industrial
     "weather forecast", "horoscope", "zodiac",
     "joke", "riddle", "puzzle", "trivia",
+    "fashion", "clothing", "makeup", "skincare",
+    "pet", "gardening", "home decor",
 ]
 
 
@@ -288,10 +369,16 @@ INTENT_PATTERNS: list[IntentPattern] = [
         "keywords": [
             "what is",
             "how does",
+            "how do",
+            "how to",
             "explain",
             "typical",
             "in general",
             "standard",
+            "tell me about",
+            "can you explain",
+            "what are",
+            "describe",
         ],
         "session_context": "any",
         "intent": "domain_knowledge",

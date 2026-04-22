@@ -355,3 +355,59 @@ def test_variable_suffix_can_omit_history_for_structured_message_mode():
     assert "Retrieved facts:" in prompt.variable_suffix
     assert "Latest user turn:" in prompt.variable_suffix
     assert "What's next?" in prompt.variable_suffix
+
+
+def test_select_history_uses_small_window_for_identity_subtype():
+    builder = ContextBuilder()
+    recent_messages = [
+        SimpleNamespace(role="user", content="m1"),
+        SimpleNamespace(role="assistant", content="m2"),
+        SimpleNamespace(role="user", content="m3"),
+        SimpleNamespace(role="assistant", content="m4"),
+    ]
+
+    selected = builder.select_history(
+        recent_messages,
+        intent="conversational",
+        conversational_subtype="identity",
+    )
+
+    assert [message.content for message in selected] == ["m3", "m4"]
+
+
+def test_select_history_uses_domain_window_for_domain_knowledge():
+    builder = ContextBuilder()
+    recent_messages = [
+        SimpleNamespace(role="user", content="m1"),
+        SimpleNamespace(role="assistant", content="m2"),
+        SimpleNamespace(role="user", content="m3"),
+        SimpleNamespace(role="assistant", content="m4"),
+        SimpleNamespace(role="user", content="m5"),
+    ]
+
+    selected = builder.select_history(
+        recent_messages,
+        intent="domain_knowledge",
+        conversational_subtype=None,
+    )
+
+    assert [message.content for message in selected] == ["m3", "m4", "m5"]
+
+
+def test_select_history_keeps_full_bounded_history_for_rfq_specific():
+    builder = ContextBuilder()
+    recent_messages = [
+        SimpleNamespace(role="user", content="m1"),
+        SimpleNamespace(role="assistant", content="m2"),
+        SimpleNamespace(role="user", content="m3"),
+        SimpleNamespace(role="assistant", content="m4"),
+        SimpleNamespace(role="user", content="m5"),
+    ]
+
+    selected = builder.select_history(
+        recent_messages,
+        intent="rfq_specific",
+        conversational_subtype=None,
+    )
+
+    assert [message.content for message in selected] == ["m1", "m2", "m3", "m4", "m5"]
