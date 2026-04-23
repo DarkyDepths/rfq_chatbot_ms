@@ -159,14 +159,28 @@ def test_observability_rfq_specific_emits_phase5_and_phase6_fields(client, app, 
         assert _log_values(caplog, "phase5.role_applied")
         assert _log_values(caplog, "phase5.role_fallback_used")
         assert _log_values(caplog, "phase5.tools_keyword_matched")
+        assert _log_values(caplog, "phase5.tools_keyword_matched")[-1] == []
         assert _log_values(caplog, "phase5.tools_allowed_after_stage")
+        assert _log_values(caplog, "phase5.tools_allowed_after_stage")[-1] == []
         assert _log_values(caplog, "phase5.tools_allowed_after_role")
+        assert _log_values(caplog, "phase5.tools_allowed_after_role")[-1] == []
         assert _log_values(caplog, "phase5.confidence_marker_emitted")
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.route_selected")[-1] == "tools_pipeline"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
         assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
         assert _log_values(caplog, "phase6.output_guardrail_result")[-1] == "pass"
+        assert _log_values(caplog, "phase7b.response_mode_selected")[-1] == "FACT_FIELD"
+        assert _log_values(caplog, "phase7b.response_mode_effective")[-1] == "FACT_FIELD"
+        assert _log_values(caplog, "phase7b.evidence_sufficient")[-1] is True
+        assert _log_values(caplog, "phase7b.evidence_downgrade_reason")[-1] is None
+        assert _log_values(caplog, "phase7b.tools_planned")[-1] == ["get_rfq_profile"]
+        assert _log_values(caplog, "phase7b.tools_executed")[-1] == []
+        assert _log_values(caplog, "phase7b.tools_from_preload")[-1] == [
+            "get_rfq_profile"
+        ]
+        assert _log_values(caplog, "phase7b.source_ref_count")[-1] == 1
+        assert _log_values(caplog, "phase7b.grounded")[-1] is True
     finally:
         _clear_dependencies(app)
 
@@ -203,6 +217,8 @@ def test_observability_domain_knowledge_has_no_stage_tool_or_grounding_fields(cl
         assert _log_values(caplog, "phase6.domain_recheck_final_intent") == []
         assert _log_values(caplog, "phase6.grounding_required") == []
         assert _log_values(caplog, "phase6.grounding_satisfied") == []
+        assert _log_values(caplog, "phase7b.response_mode_selected") == []
+        assert _log_values(caplog, "phase7b.response_mode_effective") == []
     finally:
         _clear_dependencies(app)
 

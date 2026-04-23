@@ -229,7 +229,7 @@ def test_route_domain_knowledge_on_rfq_bound_uses_direct_llm_without_tools(clien
         _clear_dependencies(app)
 
 
-def test_grounding_gap_when_tool_retrieval_attempt_fails(client, app, caplog):
+def test_rfq_specific_uses_snapshot_preload_when_profile_retrieval_fails(client, app, caplog):
     fake_azure = EchoAzureConnector()
     manager = CountingManagerConnector(fail_get_rfq=True)
     intelligence = CountingIntelligenceConnector()
@@ -251,14 +251,22 @@ def test_grounding_gap_when_tool_retrieval_attempt_fails(client, app, caplog):
 
         assert response.status_code == 200
         content = response.json()["content"].lower()
-        assert "don't have grounded" in content
-        assert "deadline" in content
-        assert response.json()["source_refs"] == []
+        assert "rfq summary" in content
+        assert "snapshot workbook not_ready" in content
+        assert any(
+            source_ref["system"] == "rfq_intelligence_ms"
+            for source_ref in response.json()["source_refs"]
+        )
         assert _log_values(caplog, "phase6.intent_classified")[-1] == "rfq_specific"
         assert _log_values(caplog, "phase6.grounding_required")[-1] is True
-        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is False
-        assert _log_values(caplog, "phase6.grounding_gap_absence_injected")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_satisfied")[-1] is True
+        assert _log_values(caplog, "phase6.grounding_gap_absence_injected") == []
         assert _log_values(caplog, "phase6.grounding_mismatch") == []
+        assert _log_values(caplog, "phase7b.response_mode_selected")[-1] == "FACT_FIELD"
+        assert _log_values(caplog, "phase7b.response_mode_effective")[-1] == "RFQ_SUMMARY"
+        assert _log_values(caplog, "phase7b.evidence_downgrade_reason")[-1] == (
+            "fact_field_unavailable"
+        )
         assert len(fake_azure.calls) == 0
     finally:
         _clear_dependencies(app)

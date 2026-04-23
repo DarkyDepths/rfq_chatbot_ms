@@ -362,36 +362,39 @@ class ChatController:
                 conversational_subtype="greeting",
             )
 
+        self._log_phase5_tool_schema_continuity()
+
         try:
-            tool_call_records = self.tool_controller.maybe_execute_retrieval(
-                effective_session,
-                command.content,
-                stage_profile=stage_resolution.profile,
-                role_profile=role_resolution.profile,
-                preloaded_rfq_detail=stage_resolution.rfq_detail,
+            response_plan = self.rfq_response_controller.compose_response_with_retrieval(
+                user_content=command.content,
+                rfq_detail=stage_resolution.rfq_detail,
+                preloaded_tool_call_records=preloaded_rfq_context.tool_call_records,
+                rfq_id=getattr(effective_session, "rfq_id", None),
+                tool_controller=self.tool_controller,
             )
         except (UpstreamServiceError, UpstreamTimeoutError) as exc:
-            tool_call_records = [self._build_retrieval_failure_record(exc)]
-
-        all_tool_call_records = [
-            *preloaded_rfq_context.tool_call_records,
-            *tool_call_records,
-        ]
-
-        response_plan = self.rfq_response_controller.compose_response(
-            user_content=command.content,
-            rfq_detail=stage_resolution.rfq_detail,
-            tool_call_records=all_tool_call_records,
-            rfq_id=getattr(effective_session, "rfq_id", None),
-        )
+            response_plan = self.rfq_response_controller.compose_response(
+                user_content=command.content,
+                rfq_detail=stage_resolution.rfq_detail,
+                tool_call_records=[
+                    *preloaded_rfq_context.tool_call_records,
+                    self._build_retrieval_failure_record(exc),
+                ],
+                rfq_id=getattr(effective_session, "rfq_id", None),
+            )
         logger.info(
             "phase6.rfq_response_mode=%s",
             response_plan.response_mode,
             extra={"phase6.rfq_response_mode": response_plan.response_mode},
         )
+        self._log_phase7b_turn_trace(response_plan)
         has_evidence = response_plan.grounded
         grounding_gap = not has_evidence
-        tool_planner_fired = len(tool_call_records) > 0
+        tool_planner_fired = bool(
+            response_plan.tools_planned
+            or response_plan.tools_executed
+            or response_plan.tools_from_preload
+        )
 
         logger.info(
             "phase6.grounding_required=%s",
@@ -751,6 +754,44 @@ class ChatController:
                 role_resolution.original_role,
                 extra={"phase5.role_original": role_resolution.original_role},
             )
+
+    @staticmethod
+    def _log_phase5_tool_schema_continuity() -> None:
+        """Preserve legacy Phase 5 keyword-planning fields for RFQ mode.
+
+        Phase 7B RFQ-specific turns no longer run keyword planning here; empty
+        lists keep the structured log schema stable without implying it ran.
+        """
+
+        for field_name in (
+            "phase5.tools_keyword_matched",
+            "phase5.tools_allowed_after_stage",
+            "phase5.tools_allowed_after_role",
+        ):
+            logger.info(
+                "%s=%s",
+                field_name,
+                [],
+                extra={field_name: []},
+            )
+
+    @staticmethod
+    def _log_phase7b_turn_trace(response_plan) -> None:
+        logger.info(
+            "phase7b.turn_trace",
+            extra={
+                "phase7b.response_mode_selected": response_plan.original_response_mode,
+                "phase7b.response_mode_effective": response_plan.effective_response_mode
+                or response_plan.response_mode,
+                "phase7b.evidence_sufficient": response_plan.evidence_sufficient,
+                "phase7b.evidence_downgrade_reason": response_plan.downgrade_reason,
+                "phase7b.tools_planned": list(response_plan.tools_planned),
+                "phase7b.tools_executed": list(response_plan.tools_executed),
+                "phase7b.tools_from_preload": list(response_plan.tools_from_preload),
+                "phase7b.source_ref_count": len(response_plan.source_refs),
+                "phase7b.grounded": response_plan.grounded,
+            },
+        )
 
     @staticmethod
     def _extract_capability_status_hit(
