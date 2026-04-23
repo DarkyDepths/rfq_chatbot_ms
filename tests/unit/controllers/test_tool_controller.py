@@ -354,6 +354,64 @@ def test_get_rfq_profile_with_preloaded_rfq_detail_reuses_without_manager_call()
     assert intelligence.get_snapshot_calls == 0
 
 
+def test_execute_single_tool_get_rfq_profile_reuses_preloaded_detail():
+    rfq_id = uuid.uuid4()
+    preloaded = _manager_rfq_detail(rfq_id)
+    controller, manager, intelligence = _build_controller()
+
+    result = controller.execute_single_tool(
+        "get_rfq_profile",
+        rfq_id,
+        preloaded_rfq_detail=preloaded,
+    )
+
+    assert result.value.id == preloaded.id
+    assert result.source_ref.system == "rfq_manager_ms"
+    assert result.source_ref.artifact == "rfq"
+    assert result.source_ref.locator == f"/rfq-manager/v1/rfqs/{rfq_id}"
+    assert manager.get_rfq_calls == 0
+    assert manager.get_rfq_stages_calls == 0
+    assert intelligence.get_snapshot_calls == 0
+
+
+def test_execute_single_tool_get_rfq_stage_uses_existing_stage_logic():
+    rfq_id = uuid.uuid4()
+    controller, manager, intelligence = _build_controller()
+
+    result = controller.execute_single_tool("get_rfq_stage", rfq_id)
+
+    assert result.source_ref.system == "rfq_manager_ms"
+    assert result.source_ref.artifact == "rfq_stages"
+    assert manager.get_rfq_stages_calls == 1
+    assert manager.get_rfq_calls == 0
+    assert intelligence.get_snapshot_calls == 0
+
+
+def test_execute_single_tool_get_rfq_snapshot_uses_existing_snapshot_logic():
+    rfq_id = uuid.uuid4()
+    controller, manager, intelligence = _build_controller()
+
+    result = controller.execute_single_tool("get_rfq_snapshot", rfq_id)
+
+    assert result.source_ref.system == "rfq_intelligence_ms"
+    assert result.source_ref.artifact == "rfq_intelligence_snapshot"
+    assert intelligence.get_snapshot_calls == 1
+    assert manager.get_rfq_calls == 0
+    assert manager.get_rfq_stages_calls == 0
+
+
+def test_execute_single_tool_unsupported_name_keeps_existing_error():
+    controller, manager, intelligence = _build_controller()
+
+    with pytest.raises(UnprocessableEntityError) as exc:
+        controller.execute_single_tool("get_unknown_tool", uuid.uuid4())
+
+    assert "Unsupported retrieval tool 'get_unknown_tool'" in str(exc.value)
+    assert manager.get_rfq_calls == 0
+    assert manager.get_rfq_stages_calls == 0
+    assert intelligence.get_snapshot_calls == 0
+
+
 def test_get_rfq_stage_ignores_preloaded_rfq_detail_and_calls_manager_stage_endpoint():
     rfq_id = uuid.uuid4()
     preloaded = _manager_rfq_detail(rfq_id)
@@ -370,6 +428,27 @@ def test_get_rfq_stage_ignores_preloaded_rfq_detail_and_calls_manager_stage_endp
     assert tool_calls[0].tool_name == "get_rfq_stage"
     assert manager.get_rfq_stages_calls == 1
     assert manager.get_rfq_calls == 0
+    assert intelligence.get_snapshot_calls == 0
+
+
+def test_maybe_execute_retrieval_keyword_behavior_is_unchanged_after_single_tool_extraction():
+    controller, manager, intelligence = _build_controller()
+    session = _session(str(uuid.uuid4()))
+
+    tool_calls = controller.maybe_execute_retrieval(
+        session,
+        "who owns this RFQ and what is the deadline?",
+        stage_profile=DEFAULT_STAGE_PROFILE,
+        role_profile=ROLE_PROFILES["estimation_dept_lead"],
+    )
+
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_name == "get_rfq_profile"
+    assert tool_calls[0].arguments["selection_reason"] == (
+        "User asked about RFQ profile metadata from manager"
+    )
+    assert manager.get_rfq_calls == 1
+    assert manager.get_rfq_stages_calls == 0
     assert intelligence.get_snapshot_calls == 0
 
 

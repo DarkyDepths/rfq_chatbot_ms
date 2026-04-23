@@ -121,7 +121,7 @@ class ToolController:
             return [self._build_capability_status_record(plan)]
 
         rfq_id = self._require_rfq_uuid(chatbot_session)
-        result = self._execute_tool(
+        result = self.execute_single_tool(
             plan.tool_name,
             rfq_id,
             preloaded_rfq_detail=preloaded_rfq_detail,
@@ -296,6 +296,21 @@ class ToolController:
                 "Phase 5 retrieval requires session.rfq_id to be a downstream UUID. "
                 "Human-readable RFQ codes like 'IF-25144' are not supported here yet."
             ) from exc
+
+    def execute_single_tool(
+        self,
+        tool_name: str,
+        rfq_id: uuid.UUID,
+        *,
+        preloaded_rfq_detail: ManagerRfqDetail | None = None,
+    ) -> ToolResultEnvelope:
+        """Execute one named retrieval tool without keyword planning."""
+
+        return self._execute_tool(
+            tool_name,
+            rfq_id,
+            preloaded_rfq_detail=preloaded_rfq_detail,
+        )
 
     def _execute_tool(
         self,

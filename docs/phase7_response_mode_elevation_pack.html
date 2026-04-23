@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 7B — Response Mode Elevation — Implementation Pack v1.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+  :root{--bg:#0f1117;--s1:#161822;--s2:#1c1f2e;--s3:#232738;--bd:#2a2e42;--bd2:#353a52;--tx:#e2e4ed;--txd:#8b8fa6;--txm:#5d6180;--grn:#6ee7b7;--grnd:#34d399;--amb:#fbbf24;--ambd:#d97706;--red:#f87171;--redd:#dc2626;--blu:#60a5fa;--blud:#3b82f6;--pur:#a78bfa;--purd:#7c3aed;--cyn:#22d3ee;--cynd:#06b6d4;--pnk:#f472b6;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--tx);font-family:'Source Serif 4',Georgia,serif;font-size:16px;line-height:1.72;padding:0;}
+  .page{max-width:920px;margin:0 auto;padding:60px 40px;}.page+.page{border-top:1px solid var(--bd);}
+  .doc-header{text-align:center;padding:80px 40px 60px;border-bottom:2px solid var(--grn);background:linear-gradient(180deg,#0d0f14 0%,var(--bg) 100%);}
+  .doc-header h1{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--grn);letter-spacing:-0.5px;margin-bottom:12px;}
+  .doc-header .subtitle{font-size:16px;color:var(--txd);font-style:italic;max-width:620px;margin:0 auto 20px;}
+  .doc-header .meta{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--txm);letter-spacing:1px;text-transform:uppercase;}
+  .sh{margin-bottom:28px;}.sh-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;}
+  .sh h2{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--tx);margin-bottom:8px;}
+  .sh p{color:var(--txd);font-size:15px;}
+  h3{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;color:var(--blu);margin:32px 0 14px;}
+  h4{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:var(--pur);margin:24px 0 10px;}
+  p{margin-bottom:14px;}strong{color:var(--tx);font-weight:600;}em{font-style:italic;color:var(--txd);}
+  code{font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--s3);padding:2px 6px;border-radius:3px;color:var(--cyn);}
+  .callout{border-left:3px solid;padding:16px 20px;margin:20px 0;border-radius:0 6px 6px 0;background:var(--s1);}
+  .callout.green{border-color:var(--grn);}.callout.amber{border-color:var(--amb);}.callout.red{border-color:var(--red);}.callout.blue{border-color:var(--blu);}.callout.purple{border-color:var(--pur);}.callout.cyan{border-color:var(--cyn);}
+  .callout .tag{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:8px;font-weight:600;}
+  .callout.green .tag{color:var(--grn);}.callout.amber .tag{color:var(--amb);}.callout.red .tag{color:var(--red);}.callout.blue .tag{color:var(--blu);}.callout.purple .tag{color:var(--pur);}.callout.cyan .tag{color:var(--cyn);}
+  pre.code{font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;background:var(--s1);padding:20px;border-radius:6px;border:1px solid var(--bd);overflow-x:auto;color:var(--txd);margin:16px 0;}
+  pre.code .hl{color:var(--grn);font-weight:600;}pre.code .new{color:var(--pur);font-weight:600;}pre.code .c{color:var(--txm);}pre.code .key{color:var(--amb);}pre.code .val{color:var(--cyn);}
+  table.tbl{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;}
+  table.tbl th{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--txm);text-align:left;padding:10px 12px;border-bottom:2px solid var(--bd);}
+  table.tbl td{padding:12px;border-bottom:1px solid var(--bd);vertical-align:top;}table.tbl tr:hover{background:var(--s1);}
+  .frozen{background:var(--s2);border:1px solid var(--grnd);border-radius:6px;padding:16px 20px;margin:16px 0;}
+  .frozen-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;display:block;}
+  .pipeline{display:flex;align-items:center;gap:0;padding:20px;margin:20px 0;background:var(--s1);border-radius:8px;border:1px solid var(--bd);overflow-x:auto;flex-wrap:wrap;justify-content:center;}
+  .pipe-step{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;padding:8px 14px;border-radius:4px;white-space:nowrap;}
+  .pipe-arrow{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--txm);padding:0 6px;}
+  .pipe-existing{background:var(--s3);color:var(--txd);}.pipe-new{background:#064e3b;color:var(--grn);border:1px solid var(--grnd);}.pipe-extend{background:#78350f33;color:var(--amb);border:1px solid var(--ambd);}
+  @media(max-width:700px){.page{padding:32px 20px;}.doc-header{padding:40px 20px;}.doc-header h1{font-size:20px;}}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- HEADER -->
+<!-- ============================================================ -->
+<div class="doc-header">
+  <h1>Phase 7B — Response Mode Elevation</h1>
+  <p class="subtitle">Implementation Pack v1.0 — Frozen decisions, contracts, and file-level scope grounded in the actual codebase.</p>
+  <p class="meta">Document type: Implementation Pack ("what") · April 2026 · Predecessor: Phase 6 + Phase 7A (expanded scope)</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- S1 — SCOPE & BASELINE -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 1</div>
+      <h2>Scope & Codebase Baseline</h2>
+      <p>What already exists, what this Pack adds, and what it does not touch.</p>
+    </div>
+
+    <h3>1.1 What already exists</h3>
+    <p>Phase 7A (the expanded scope document <code>rfq_chatbot_ms_phase7_expanded_scope.md</code>) was already implemented. The codebase contains:</p>
+
+    <table class="tbl">
+      <thead><tr><th>Component</th><th>File</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Response mode selection (4 modes: FACT_FIELD, RFQ_SUMMARY, RFQ_DETAIL, RFQ_ADVISORY)</td><td><code>controllers/rfq_response_controller.py</code> L21, L333–348</td><td>Implemented — keyword-based, deterministic</td></tr>
+        <tr><td>Unified RFQ view (normalized manager + intelligence merge)</td><td><code>controllers/rfq_response_controller.py</code> L57–82, L237–331</td><td>Implemented — <code>UnifiedRfqView</code> dataclass</td></tr>
+        <tr><td>Mode-specific rendering (fact field, summary, detail, advisory)</td><td><code>controllers/rfq_response_controller.py</code> L350–594</td><td>Implemented — deterministic grounded composition</td></tr>
+        <tr><td>Intent classification (6 intents)</td><td><code>controllers/intent_controller.py</code> L90–160</td><td>Implemented — deterministic + domain recheck</td></tr>
+        <tr><td>Tool selection (3 tools: profile, stage, snapshot)</td><td><code>controllers/tool_controller.py</code> L142–226</td><td>Implemented — keyword + stage/role filtering</td></tr>
+        <tr><td>Context builder with intent-aware sections</td><td><code>controllers/context_builder.py</code> L221–311</td><td>Implemented — FD-7 matrix</td></tr>
+        <tr><td>Output guardrail</td><td><code>controllers/output_guardrail.py</code></td><td>Implemented — domain leak, grounding, shape checks</td></tr>
+        <tr><td>RFQ preloading on first turn</td><td><code>controllers/chat_controller.py</code> L806–877</td><td>Implemented — profile + snapshot</td></tr>
+        <tr><td>Golden set (22 cases)</td><td><code>golden_set/cases/</code></td><td>Implemented</td></tr>
+        <tr><td>Structured trace logging</td><td><code>chat_controller.py</code> throughout</td><td>Partial — intent + grounding logged, but not response mode or tool plan</td></tr>
+      </tbody>
+    </table>
+
+    <h3>1.2 What this Pack adds</h3>
+    <p>Phase 7B is not a rewrite. It is a targeted elevation of the existing response-mode machinery. Three new capabilities, three file extensions, zero new files created.</p>
+
+    <div class="callout green">
+      <span class="tag">Phase 7B scope — three moves</span>
+      <p><strong>Move 1:</strong> Make tool selection mode-driven. <code>tool_controller.py</code> currently selects tools by keyword independently of the response mode. After 7B, the response mode determines which tools to call and how much data to inject.</p>
+      <p><strong>Move 2:</strong> Add evidence evaluation before rendering. A new method in <code>rfq_response_controller.py</code> checks whether tool results are sufficient for the chosen mode and downgrades honestly when evidence is lacking.</p>
+      <p><strong>Move 3:</strong> Complete the trace logging. Every turn logs a structured JSON trace object covering intent → response mode → tool plan → evidence evaluation → grounding result.</p>
+    </div>
+
+    <h3>1.3 What this Pack does NOT touch</h3>
+    <table class="tbl">
+      <thead><tr><th>Item</th><th>Why excluded</th></tr></thead>
+      <tbody>
+        <tr><td>Intelligence signals endpoint (<code>GET /rfqs/{id}/signals</code>)</td><td>Belongs in <code>rfq_intelligence_ms</code>, not this service. Contract designed here; implementation deferred.</td></tr>
+        <tr><td>Multi-agent decomposition</td><td>V2 concern. V1 single orchestrator not yet exhausted.</td></tr>
+        <tr><td>LangGraph / LangSmith integration</td><td>Structured logging is sufficient for defense. Vendor tooling is post-defense.</td></tr>
+        <tr><td>New tools (document RAG, what-if, list_rfqs)</td><td>Priority 2. Tool-mode matrix designed for current 3-tool surface.</td></tr>
+        <tr><td>New response modes beyond existing 7</td><td>DOMAIN_KNOWLEDGE, OUT_OF_SCOPE, COURTESY are handled by intent routes; the response-mode planner only governs rfq_specific intents. No change.</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S2 — FROZEN DECISIONS -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 2</div>
+      <h2>Frozen Decisions</h2>
+      <p>Every decision in this section is final. No modification during implementation without explicit Pack amendment.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-1 · Response mode enum stays as-is</span>
+      <p>The four RFQ response modes remain: <code>FACT_FIELD</code>, <code>RFQ_SUMMARY</code>, <code>RFQ_DETAIL</code>, <code>RFQ_ADVISORY</code>. The existing <code>RfqResponseMode</code> Literal type (L21 of <code>rfq_response_controller.py</code>) is not extended. The three non-RFQ modes (DOMAIN_KNOWLEDGE, OUT_OF_SCOPE, COURTESY) continue to be handled by intent routing in <code>chat_controller.py</code> — they never reach the response controller.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-2 · Response mode selection stays in rfq_response_controller</span>
+      <p>The <code>_select_response_mode()</code> method (L333–348) remains the single authority for mode selection. It is not moved to a new controller. Reason: it already exists, works, and is deterministic. Creating a separate <code>response_mode_controller.py</code> would split logic unnecessarily. The method is extended, not relocated.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-3 · Tool selection becomes mode-aware</span>
+      <p>Currently, <code>tool_controller._plan_tool_use()</code> selects tools by keyword matching, independently of the response mode. After 7B, the <code>rfq_response_controller</code> calls tools via the tool controller using a mode-driven tool plan — not keyword matching. The existing keyword logic in <code>tool_controller</code> remains as a fallback for turns that don't go through the response controller (unsupported, disambiguation).</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-4 · Evidence evaluation is a pre-render gate</span>
+      <p>A new method <code>_evaluate_evidence()</code> in <code>rfq_response_controller.py</code> runs between tool execution and <code>_render_for_mode()</code>. If the evidence is insufficient for the selected mode, the mode is downgraded (e.g., RFQ_ADVISORY → RFQ_DETAIL with an honest caveat). The downgrade is deterministic and logged.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-5 · No new LLM calls</span>
+      <p>Phase 7B adds zero new Azure OpenAI calls. Response mode selection is deterministic. Evidence evaluation is deterministic. Tool planning is deterministic. The only LLM call per turn remains the existing generation call in <code>_generate_and_persist_turn()</code>.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-6 · The rfq_specific path bypasses LLM generation for grounded responses</span>
+      <p>This is the existing behavior and it stays. When <code>_handle_rfq_specific</code> delegates to <code>rfq_response_controller.compose_response()</code>, the assistant text is composed deterministically. The LLM is NOT called for rfq_specific turns that go through the response controller. This is a strength, not a gap.</p>
+    </div>
+
+    <div class="frozen">
+      <span class="frozen-label">FD-7B-7 · Trace schema is additive</span>
+      <p>New trace fields are added to existing log lines. No existing log fields are removed or renamed. The trace object is logged as a single structured JSON line at the end of <code>_handle_rfq_specific()</code>.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S3 — TOOL-MODE MATRIX -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 3</div>
+      <h2>Tool-Mode Matrix</h2>
+      <p>Which tools each response mode requires, and what evidence check applies.</p>
+    </div>
+
+    <table class="tbl">
+      <thead>
+        <tr><th>Response mode</th><th>Required tools</th><th>Optional tools</th><th>Evidence sufficient when</th><th>Downgrade target</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>FACT_FIELD</code></td>
+          <td><code>get_rfq_profile</code></td>
+          <td><code>get_rfq_stage</code> (if stage-related field)</td>
+          <td>Requested field exists and is non-null in unified view</td>
+          <td>→ RFQ_SUMMARY (if field not found, fallback to summary — this already happens at L396)</td>
+        </tr>
+        <tr>
+          <td><code>RFQ_SUMMARY</code></td>
+          <td><code>get_rfq_profile</code></td>
+          <td><code>get_rfq_snapshot</code></td>
+          <td>At least one source ref present (profile or snapshot)</td>
+          <td>→ grounding gap (no source refs = "I don't have grounded RFQ data available right now")</td>
+        </tr>
+        <tr>
+          <td><code>RFQ_DETAIL</code></td>
+          <td><code>get_rfq_profile</code> + <code>get_rfq_stage</code></td>
+          <td><code>get_rfq_snapshot</code></td>
+          <td>Profile source ref present + at least one additional source (stage or snapshot)</td>
+          <td>→ RFQ_SUMMARY (if only profile available, downgrade to summary depth)</td>
+        </tr>
+        <tr>
+          <td><code>RFQ_ADVISORY</code></td>
+          <td><code>get_rfq_profile</code> + <code>get_rfq_snapshot</code></td>
+          <td><code>get_rfq_stage</code></td>
+          <td>Snapshot source ref present (snapshot is the primary advisory evidence source)</td>
+          <td>→ RFQ_DETAIL with caveat ("I can show current RFQ state, but grounded advisory signals require intelligence data that isn't fully available yet.")</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout amber">
+      <span class="tag">Implementation note</span>
+      <p>This matrix is codified as a dict constant in <code>rfq_response_controller.py</code>. It is NOT a separate config file. Reason: the matrix is tightly coupled to the mode enum and the rendering logic — separating it would create drift risk between the matrix and the code that reads it.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S4 — EVIDENCE EVALUATION CONTRACT -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 4</div>
+      <h2>Evidence Evaluation Contract</h2>
+      <p>The new pre-render gate that prevents fake intelligence and shallow restatement.</p>
+    </div>
+
+    <h3>4.1 Data contract</h3>
+
+    <pre class="code"><span class="c"># New dataclass in rfq_response_controller.py</span>
+
+<span class="hl">@dataclass(frozen=True)</span>
+<span class="hl">class EvidenceEvaluation:</span>
+    <span class="key">"""Pre-render evidence sufficiency check."""</span>
+    <span class="val">original_mode</span>: RfqResponseMode
+    <span class="val">effective_mode</span>: RfqResponseMode       <span class="c"># may differ if downgraded</span>
+    <span class="val">sufficient</span>: bool
+    <span class="val">downgrade_reason</span>: str | None = None  <span class="c"># human-readable, logged</span>
+    <span class="val">caveat_text</span>: str | None = None       <span class="c"># injected into response if downgraded</span></pre>
+
+    <h3>4.2 Evaluation rules (deterministic)</h3>
+
+    <pre class="code"><span class="c"># Method: _evaluate_evidence(selection, unified_view) -> EvidenceEvaluation</span>
+
+<span class="c"># Rule 1: FACT_FIELD — check if the requested field is non-null</span>
+<span class="c">#   Already handled by existing _render_fact_field fallback at L396</span>
+<span class="c">#   No change needed — existing behavior is correct</span>
+
+<span class="c"># Rule 2: RFQ_SUMMARY — check if any source ref exists</span>
+<span class="c">#   Already handled by existing _render_summary at L511-512</span>
+<span class="c">#   No change needed — existing behavior is correct</span>
+
+<span class="c"># Rule 3: RFQ_DETAIL — check if profile + at least one more source</span>
+<span class="key">if</span> selection.mode == <span class="val">"RFQ_DETAIL"</span>:
+    has_profile = unified_view.profile_source_ref <span class="key">is not</span> None
+    has_stage = unified_view.stage_source_ref <span class="key">is not</span> None
+    has_snapshot = unified_view.snapshot_source_ref <span class="key">is not</span> None
+    <span class="key">if</span> has_profile <span class="key">and not</span> (has_stage <span class="key">or</span> has_snapshot):
+        → downgrade to RFQ_SUMMARY
+        caveat = None  <span class="c"># summary is still useful, no caveat needed</span>
+
+<span class="c"># Rule 4: RFQ_ADVISORY — check if snapshot exists</span>
+<span class="key">if</span> selection.mode == <span class="val">"RFQ_ADVISORY"</span>:
+    has_snapshot = unified_view.snapshot_source_ref <span class="key">is not</span> None
+    <span class="key">if not</span> has_snapshot:
+        → downgrade to RFQ_DETAIL
+        caveat = <span class="val">"Grounded advisory signals require intelligence snapshot data "</span>
+                 <span class="val">"that isn't fully available for this RFQ yet. "</span>
+                 <span class="val">"Here is the current operational state instead."</span></pre>
+
+    <h3>4.3 Integration point</h3>
+    <p>The evaluation runs inside <code>compose_response()</code> between <code>_select_response_mode()</code> (L180) and <code>_render_for_mode()</code> (L181). The existing flow becomes:</p>
+
+    <pre class="code"><span class="c"># Current flow (rfq_response_controller.compose_response):</span>
+selection = self._select_response_mode(normalized_content)
+assistant_text, source_refs = self._render_for_mode(selection, ...)
+
+<span class="c"># New flow:</span>
+selection = self._select_response_mode(normalized_content)
+<span class="new">evidence = self._evaluate_evidence(selection, unified_view)</span>
+<span class="new">effective_selection = ResponseModeSelection(mode=evidence.effective_mode,</span>
+<span class="new">                                             advisory_focus=selection.advisory_focus)</span>
+assistant_text, source_refs = self._render_for_mode(<span class="new">effective_selection</span>, ...)
+<span class="new">if evidence.caveat_text and assistant_text:</span>
+<span class="new">    assistant_text = f"{evidence.caveat_text}\n\n{assistant_text}"</span></pre>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S5 — MODE-DRIVEN TOOL SELECTION -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 5</div>
+      <h2>Mode-Driven Tool Selection</h2>
+      <p>Making tool calls predictable by response mode, not query keywords.</p>
+    </div>
+
+    <h3>5.1 The architectural change</h3>
+    <p>Currently in <code>_handle_rfq_specific()</code> (chat_controller.py L365–373), tool selection happens <em>before</em> response mode selection. The flow is:</p>
+
+    <div class="pipeline">
+      <span class="pipe-step pipe-existing">intent</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-existing">tool_controller (keywords)</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-existing">rfq_response_controller (mode + render)</span>
+    </div>
+
+    <p>After 7B, the response controller receives the raw preloaded context and drives tool selection itself:</p>
+
+    <div class="pipeline">
+      <span class="pipe-step pipe-existing">intent</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-new">rfq_response_controller (mode → tools → evidence → render)</span>
+    </div>
+
+    <h3>5.2 What changes in _handle_rfq_specific</h3>
+    <p>The existing <code>tool_controller.maybe_execute_retrieval()</code> call at L366 is replaced by a new <code>rfq_response_controller.compose_response_with_retrieval()</code> method that:</p>
+
+    <pre class="code"><span class="c"># New method: compose_response_with_retrieval()</span>
+<span class="c"># 1. Select response mode from user query (existing _select_response_mode)</span>
+<span class="c"># 2. Look up required tools from the tool-mode matrix</span>
+<span class="c"># 3. For each required tool NOT already in preloaded_tool_call_records:</span>
+<span class="c">#    → call tool_controller.execute_single_tool(tool_name, rfq_id)</span>
+<span class="c"># 4. Build unified view from all tool results</span>
+<span class="c"># 5. Evaluate evidence sufficiency</span>
+<span class="c"># 6. Render for effective mode</span>
+<span class="c"># 7. Return RfqResponsePlan with all metadata</span></pre>
+
+    <h3>5.3 What changes in tool_controller</h3>
+    <p>A new public method <code>execute_single_tool(tool_name, rfq_id, preloaded_rfq_detail)</code> is extracted from the existing <code>_execute_tool()</code> private method. This allows the response controller to call specific tools by name without going through keyword matching. The existing <code>maybe_execute_retrieval()</code> remains unchanged for non-rfq-specific paths (unsupported, disambiguation).</p>
+
+    <h3>5.4 Preloaded context handling</h3>
+    <p>The first-turn preload (chat_controller L806–877) already fetches profile + snapshot. The response controller checks preloaded records before calling tools again: if <code>get_rfq_profile</code> is already in the preloaded records, don't call it again. This is a deduplication check, not a new concept — the existing <code>_ensure_primary_profile_record()</code> at L194–235 already does this for profiles.</p>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S6 — TRACE LOGGING -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 6</div>
+      <h2>Structured Trace Logging</h2>
+      <p>Completing the observability gap.</p>
+    </div>
+
+    <h3>6.1 Current logging state</h3>
+    <p>The codebase already logs: <code>phase6.intent_classified</code>, <code>phase6.route_selected</code>, <code>phase6.grounding_required</code>, <code>phase6.grounding_satisfied</code>, <code>phase5.role_applied</code>, <code>phase5.tools_keyword_matched</code>, <code>phase5.tools_allowed_after_stage</code>, <code>phase6.output_guardrail_result</code>. What's missing: response mode, tool plan, evidence evaluation, and a unified turn trace object.</p>
+
+    <h3>6.2 New trace fields</h3>
+
+    <pre class="code"><span class="c"># Added to _handle_rfq_specific after compose_response returns:</span>
+
+logger.info(
+    <span class="val">"phase7b.turn_trace"</span>,
+    extra={
+        <span class="key">"phase7b.response_mode_selected"</span>: response_plan.response_mode,
+        <span class="key">"phase7b.response_mode_original"</span>: response_plan.original_mode,  <span class="c"># before downgrade</span>
+        <span class="key">"phase7b.evidence_sufficient"</span>: response_plan.evidence_sufficient,
+        <span class="key">"phase7b.evidence_downgrade_reason"</span>: response_plan.downgrade_reason,
+        <span class="key">"phase7b.tools_planned"</span>: response_plan.tools_planned,           <span class="c"># list of tool names</span>
+        <span class="key">"phase7b.tools_executed"</span>: response_plan.tools_executed,          <span class="c"># list of tool names</span>
+        <span class="key">"phase7b.tools_from_preload"</span>: response_plan.tools_from_preload,  <span class="c"># list of tool names</span>
+        <span class="key">"phase7b.source_ref_count"</span>: len(response_plan.source_refs),
+        <span class="key">"phase7b.grounded"</span>: response_plan.grounded,
+    },
+)</pre>
+
+    <h3>6.3 RfqResponsePlan extension</h3>
+    <p>The existing <code>RfqResponsePlan</code> dataclass (L94–101) is extended with the new trace fields. These are metadata-only — they don't affect the response content:</p>
+
+    <pre class="code"><span class="hl">@dataclass(frozen=True)</span>
+<span class="hl">class RfqResponsePlan:</span>
+    response_mode: RfqResponseMode           <span class="c"># effective mode (after any downgrade)</span>
+    assistant_text: str
+    grounded: bool
+    source_refs: list[SourceRef]
+    tool_call_records: list[ToolCallRecord]
+    <span class="new"># Phase 7B trace metadata</span>
+    <span class="new">original_mode: RfqResponseMode | None = None</span>      <span class="c"># before downgrade, None if no downgrade</span>
+    <span class="new">evidence_sufficient: bool = True</span>
+    <span class="new">downgrade_reason: str | None = None</span>
+    <span class="new">tools_planned: tuple[str, ...] = ()</span>
+    <span class="new">tools_executed: tuple[str, ...] = ()</span>
+    <span class="new">tools_from_preload: tuple[str, ...] = ()</span></pre>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S7 — FILE-BY-FILE SCOPE -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 7</div>
+      <h2>File-by-File Scope</h2>
+      <p>Exactly what changes in each file. Nothing more.</p>
+    </div>
+
+    <table class="tbl">
+      <thead><tr><th>File</th><th>Action</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>controllers/<br>rfq_response_controller.py</code></td>
+          <td>Extend</td>
+          <td>Add <code>TOOL_MODE_MATRIX</code> dict constant. Add <code>EvidenceEvaluation</code> dataclass. Add <code>_evaluate_evidence()</code> method. Add <code>compose_response_with_retrieval()</code> method that wraps mode selection → tool plan → tool execution → evidence check → render. Extend <code>RfqResponsePlan</code> with trace metadata fields. Modify <code>compose_response()</code> to call evidence evaluation before rendering.</td>
+        </tr>
+        <tr>
+          <td><code>controllers/<br>tool_controller.py</code></td>
+          <td>Extend</td>
+          <td>Extract <code>execute_single_tool(tool_name, rfq_id, preloaded_rfq_detail)</code> as a public method from existing <code>_execute_tool()</code>. No other changes. <code>maybe_execute_retrieval()</code> stays for non-rfq-specific paths.</td>
+        </tr>
+        <tr>
+          <td><code>controllers/<br>chat_controller.py</code></td>
+          <td>Extend</td>
+          <td>In <code>_handle_rfq_specific()</code>: replace the <code>tool_controller.maybe_execute_retrieval()</code> + <code>rfq_response_controller.compose_response()</code> two-step with a single <code>rfq_response_controller.compose_response_with_retrieval()</code> call. Add the <code>phase7b.turn_trace</code> structured log line. Pass <code>tool_controller</code> reference to the response controller.</td>
+        </tr>
+        <tr>
+          <td><code>golden_set/cases/</code></td>
+          <td>Add</td>
+          <td>4 new cases: 23_advisory_downgrade_no_snapshot.json, 24_detail_downgrade_profile_only.json, 25_mode_selection_fact_field.json, 26_mode_selection_advisory.json</td>
+        </tr>
+        <tr>
+          <td><code>golden_set/harness.py</code></td>
+          <td>Extend</td>
+          <td>Add assertions for: <code>expected_response_mode</code> (verify mode selection), <code>expected_evidence_sufficient</code> (verify evidence evaluation), <code>expected_downgrade</code> (verify downgrade behavior).</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout red">
+      <span class="tag">Files NOT touched</span>
+      <p><code>intent_controller.py</code> — no changes. <code>context_builder.py</code> — no changes. <code>output_guardrail.py</code> — no changes. <code>config/prompt_templates.py</code> — no changes. <code>connectors/</code> — no changes. <code>models/</code> — no changes. <code>routes/</code> — no changes. <code>app_context.py</code> — no changes (rfq_response_controller is already injected into chat_controller).</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S8 — GOLDEN SET ADDITIONS -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 8</div>
+      <h2>Golden Set Additions</h2>
+      <p>Four new test cases validating the Phase 7B behavior.</p>
+    </div>
+
+    <table class="tbl">
+      <thead><tr><th>Case</th><th>Query</th><th>Expected mode</th><th>Expected behavior</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>23</td>
+          <td>"What are the risks on this RFQ?" (snapshot unavailable)</td>
+          <td>RFQ_ADVISORY → downgrade to RFQ_DETAIL</td>
+          <td>Response includes operational state + caveat about advisory signals requiring intelligence data. <code>evidence_sufficient=false</code>. <code>downgrade_reason="snapshot_unavailable"</code>.</td>
+        </tr>
+        <tr>
+          <td>24</td>
+          <td>"What are the current details about this RFQ?" (only profile available, no stage/snapshot)</td>
+          <td>RFQ_DETAIL → downgrade to RFQ_SUMMARY</td>
+          <td>Response is summary-depth, not detail-depth. No caveat needed (summary is still useful).</td>
+        </tr>
+        <tr>
+          <td>25</td>
+          <td>"What is the deadline?"</td>
+          <td>FACT_FIELD (no downgrade)</td>
+          <td>One-sentence answer with deadline value + source_ref. <code>tools_planned=["get_rfq_profile"]</code>.</td>
+        </tr>
+        <tr>
+          <td>26</td>
+          <td>"What should I watch out for?" (snapshot available)</td>
+          <td>RFQ_ADVISORY (no downgrade)</td>
+          <td>Structured advisory with concerns/missing/attention sections. <code>tools_planned=["get_rfq_profile","get_rfq_snapshot"]</code>. <code>evidence_sufficient=true</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S9 — IMPLEMENTATION SEQUENCE -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 9</div>
+      <h2>Implementation Sequence</h2>
+      <p>Order matters. Each step has a review checkpoint before the next begins.</p>
+    </div>
+
+    <div class="pipeline">
+      <span class="pipe-step pipe-new">Step 1</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-new">Step 2</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-new">Step 3</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-new">Step 4</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-step pipe-new">Step 5</span>
+    </div>
+
+    <h3>Step 1 — Evidence evaluation in rfq_response_controller</h3>
+    <p>Add <code>EvidenceEvaluation</code> dataclass, <code>TOOL_MODE_MATRIX</code> constant, and <code>_evaluate_evidence()</code> method. Wire into existing <code>compose_response()</code> between mode selection and rendering. Extend <code>RfqResponsePlan</code> with trace fields. All existing tests must still pass.</p>
+    <p><strong>Review checkpoint:</strong> Unit test — RFQ_ADVISORY query with no snapshot → returns downgraded RFQ_DETAIL plan with caveat. Existing golden set cases still pass.</p>
+
+    <h3>Step 2 — extract execute_single_tool in tool_controller</h3>
+    <p>Make <code>_execute_tool()</code> public as <code>execute_single_tool()</code>. No behavioral change. All existing tests must still pass.</p>
+    <p><strong>Review checkpoint:</strong> Existing tests pass. New method callable by response controller.</p>
+
+    <h3>Step 3 — compose_response_with_retrieval</h3>
+    <p>New method in <code>rfq_response_controller</code> that accepts tool_controller reference + preloaded records, determines required tools from matrix, deduplicates against preload, executes missing tools, builds unified view, evaluates evidence, and renders. Returns enriched <code>RfqResponsePlan</code>.</p>
+    <p><strong>Review checkpoint:</strong> Integration test — full compose_response_with_retrieval call with mocked connectors, verifying tool plan + evidence evaluation + correct rendering.</p>
+
+    <h3>Step 4 — Wire into chat_controller</h3>
+    <p>Replace the two-step tool+response flow in <code>_handle_rfq_specific()</code> with the single <code>compose_response_with_retrieval()</code> call. Add <code>phase7b.turn_trace</code> log line. Pass tool_controller to response controller constructor or method parameter.</p>
+    <p><strong>Review checkpoint:</strong> Full smoke test — Postman rfq_specific queries return correct responses. Structured logs include phase7b fields. All golden set cases pass.</p>
+
+    <h3>Step 5 — Golden set cases + final verification</h3>
+    <p>Add the 4 new golden set cases (23–26). Extend harness with mode/evidence assertions. Run full golden set. Verify all 26 cases pass.</p>
+    <p><strong>Review checkpoint:</strong> All 26 golden set cases green. Structured logs verified. Defense demo script runs clean.</p>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- S10 — INTELLIGENCE SIGNALS CONTRACT (DESIGNED, NOT BUILT) -->
+<!-- ============================================================ -->
+<div class="page">
+  <section>
+    <div class="sh">
+      <div class="sh-num">Section 10</div>
+      <h2>Intelligence Signals Contract (Designed, Not Built)</h2>
+      <p>This is for defense presentation only. Implementation is deferred to <code>rfq_intelligence_ms</code>.</p>
+    </div>
+
+    <pre class="code"><span class="c"># Future endpoint: rfq_intelligence_ms</span>
+<span class="hl">GET /rfq-intelligence/v1/rfqs/{rfq_id}/signals</span>
+
+<span class="c"># Response schema:</span>
+{
+  <span class="key">"rfq_id"</span>: <span class="val">"uuid"</span>,
+  <span class="key">"computed_at"</span>: <span class="val">"datetime"</span>,
+  <span class="key">"completeness_gaps"</span>: [
+    {<span class="key">"field"</span>: <span class="val">"workbook_data"</span>, <span class="key">"severity"</span>: <span class="val">"high"</span>, <span class="key">"detail"</span>: <span class="val">"No parsed workbook data available"</span>}
+  ],
+  <span class="key">"risk_flags"</span>: [
+    {<span class="key">"type"</span>: <span class="val">"timeline_pressure"</span>, <span class="key">"severity"</span>: <span class="val">"medium"</span>, <span class="key">"detail"</span>: <span class="val">"Progress 45% with 12 days to deadline"</span>}
+  ],
+  <span class="key">"readiness_score"</span>: <span class="val">0.35</span>,
+  <span class="key">"attention_items"</span>: [
+    <span class="val">"Active review findings require resolution before estimation confidence is high"</span>
+  ],
+  <span class="key">"source_ref"</span>: {
+    <span class="key">"system"</span>: <span class="val">"rfq_intelligence_ms"</span>,
+    <span class="key">"artifact"</span>: <span class="val">"signals"</span>,
+    <span class="key">"locator"</span>: <span class="val">"/rfq-intelligence/v1/rfqs/{rfq_id}/signals"</span>
+  }
+}</pre>
+
+    <div class="callout purple">
+      <span class="tag">Defense framing</span>
+      <p>When this endpoint exists, the chatbot's RFQ_ADVISORY mode will consume these structured signals instead of deriving advisory content from the raw snapshot. The current advisory rendering in <code>_derive_advisory_sections()</code> is a correct intermediate step — it already computes concerns, missing elements, and attention items from available data. The signals endpoint formalizes and enriches this computation at the intelligence layer where it architecturally belongs.</p>
+    </div>
+  </section>
+</div>
+
+<!-- ============================================================ -->
+<!-- FOOTER -->
+<!-- ============================================================ -->
+<div class="page" style="text-align:center; padding-bottom:80px;">
+  <p style="color:var(--txm); font-family:'JetBrains Mono',monospace; font-size:12px;">Phase 7B Implementation Pack v1.0 — Ready for Blueprint</p>
+</div>
+
+</body>
+</html>
