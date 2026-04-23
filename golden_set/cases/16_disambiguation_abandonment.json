@@ -16,7 +16,7 @@
     {
       "user_content": "Never mind, what is PWHT?",
       "expect": {
-        "intent": "general_knowledge",
+        "intent": "domain_knowledge",
         "route": "direct_llm",
         "disambiguation_abandoned": true,
         "source_refs_present": false,

@@ -1,28 +1,31 @@
 {
-  "id": "stage_fallback_default_profile",
-  "description": "Unknown stage id applies default neutral stage framing.",
+  "id": "phase7b_fact_field_success",
+  "description": "Phase 7B: fact-field request selects and keeps FACT_FIELD with sufficient evidence.",
   "session": {
     "mode": "rfq",
     "rfq_id": "__AUTO_UUID__",
     "role": "estimation_dept_lead"
   },
   "scenario": {
-    "manager_mode": "default_stage",
+    "manager_mode": "known_stage",
     "intelligence_mode": "ok"
   },
   "turns": [
     {
-      "user_content": "What stage is this RFQ in?",
+      "user_content": "What is the deadline?",
       "expect": {
         "intent": "rfq_specific",
         "route": "tools_pipeline",
-        "tools_include": ["get_rfq_stage"],
         "source_refs_present": true,
-        "required_patterns": ["current stage is Unknown Stage"],
+        "expected_min_source_ref_count": 1,
         "expected_response_mode_selected": "FACT_FIELD",
         "expected_response_mode_effective": "FACT_FIELD",
         "expected_evidence_sufficient": true,
-        "expected_downgrade_reason": null
+        "expected_downgrade_reason": null,
+        "expected_grounded": true,
+        "required_patterns": [
+          "deadline is 2026-05-01"
+        ]
       }
     }
   ]

@@ -1,0 +1,35 @@
+{
+  "id": "phase7b_advisory_snapshot_success",
+  "description": "Phase 7B: advisory request stays advisory when snapshot evidence is available.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "known_stage",
+    "intelligence_mode": "ok"
+  },
+  "turns": [
+    {
+      "user_content": "What should I watch out for?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "source_refs_present": true,
+        "expected_min_source_ref_count": 1,
+        "expected_response_mode_selected": "RFQ_ADVISORY",
+        "expected_response_mode_effective": "RFQ_ADVISORY",
+        "expected_evidence_sufficient": true,
+        "expected_downgrade_reason": null,
+        "expected_grounded": true,
+        "required_patterns": [
+          "RFQ advisory",
+          "Missing / incomplete",
+          "What needs attention",
+          "Snapshot workbook status is not_ready"
+        ]
+      }
+    }
+  ]
+}

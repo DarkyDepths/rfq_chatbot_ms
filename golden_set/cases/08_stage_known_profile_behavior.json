@@ -18,8 +18,11 @@
         "route": "tools_pipeline",
         "tools_include": ["get_rfq_stage"],
         "source_refs_present": true,
-        "required_patterns": ["go\\s*/\\s*no-go", "qualification risk"],
-        "stable_prefix_required": ["Stage framing: Treat the RFQ as being in Go / No-Go", "Current stage label: Go / No-Go"]
+        "required_patterns": ["current stage is Go\\s*/\\s*No-Go"],
+        "expected_response_mode_selected": "FACT_FIELD",
+        "expected_response_mode_effective": "FACT_FIELD",
+        "expected_evidence_sufficient": true,
+        "expected_downgrade_reason": null
       }
     }
   ]

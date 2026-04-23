@@ -214,6 +214,9 @@ class GoldenManagerConnector(ManagerConnector):
 
     def get_rfq_stages(self, rfq_id):
         self.get_rfq_stages_calls += 1
+        if self.mode == "stage_failure":
+            raise UpstreamServiceError("Manager stage service request failed")
+
         return ManagerRfqStageListResponse.model_validate(
             {
                 "data": [
@@ -367,7 +370,8 @@ def _execute_turn(*, turn: dict, session_id: str, client, db_session, caplog, az
     ).one()
 
     turn_records = caplog.records[records_start:]
-    azure_call = azure_connector.calls[calls_start]
+    azure_call_occurred = len(azure_connector.calls) > calls_start
+    azure_call = azure_connector.calls[calls_start] if azure_call_occurred else None
     tool_calls = assistant_message.tool_calls or []
     tool_names = [
         tool_call.get("tool_name")
@@ -393,8 +397,27 @@ def _execute_turn(*, turn: dict, session_id: str, client, db_session, caplog, az
         ),
         "content": payload["content"],
         "source_refs_present": bool(payload.get("source_refs")),
+        "source_ref_count": len(payload.get("source_refs") or []),
         "tools": tool_names,
-        "stable_prefix": azure_call["stable_prefix"],
+        "azure_call_occurred": azure_call_occurred,
+        "stable_prefix": azure_call["stable_prefix"] if azure_call else None,
+        "response_mode_selected": _last_extra(
+            turn_records,
+            "phase7b.response_mode_selected",
+        ),
+        "response_mode_effective": _last_extra(
+            turn_records,
+            "phase7b.response_mode_effective",
+        ),
+        "evidence_sufficient": _last_extra(
+            turn_records,
+            "phase7b.evidence_sufficient",
+        ),
+        "downgrade_reason": _last_extra(
+            turn_records,
+            "phase7b.evidence_downgrade_reason",
+        ),
+        "grounded": _last_extra(turn_records, "phase7b.grounded"),
     }
 
     from golden_set.judges import assert_turn_expectations

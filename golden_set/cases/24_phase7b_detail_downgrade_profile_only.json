@@ -1,0 +1,37 @@
+{
+  "id": "phase7b_detail_downgrade_profile_only",
+  "description": "Phase 7B: detail request downgrades to summary when only profile evidence is available.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "stage_failure",
+    "intelligence_mode": "failure"
+  },
+  "turns": [
+    {
+      "user_content": "What are the current details about this RFQ?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "source_refs_present": true,
+        "expected_min_source_ref_count": 1,
+        "expected_response_mode_selected": "RFQ_DETAIL",
+        "expected_response_mode_effective": "RFQ_SUMMARY",
+        "expected_evidence_sufficient": false,
+        "expected_downgrade_reason": "detail_evidence_profile_only",
+        "expected_grounded": true,
+        "required_patterns": [
+          "RFQ summary",
+          "Boiler Upgrade",
+          "Acme Industrial"
+        ],
+        "forbidden_patterns": [
+          "grounded advisory signals"
+        ]
+      }
+    }
+  ]
+}

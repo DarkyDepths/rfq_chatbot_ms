@@ -10,7 +10,7 @@
     {
       "user_content": "In general, how does RT work?",
       "expect": {
-        "intent": "general_knowledge",
+        "intent": "domain_knowledge",
         "route": "direct_llm",
         "tools_exclude": ["get_capability_status"],
         "source_refs_present": false,

@@ -27,6 +27,12 @@ def assert_turn_expectations(expect: dict, observed: dict) -> None:
     if "source_refs_present" in expect:
         assert observed["source_refs_present"] is bool(expect["source_refs_present"])
 
+    if "expected_min_source_ref_count" in expect:
+        assert observed["source_ref_count"] >= int(expect["expected_min_source_ref_count"])
+
+    if "azure_call_occurred" in expect:
+        assert observed["azure_call_occurred"] is bool(expect["azure_call_occurred"])
+
     if "required_patterns" in expect:
         _assert_required_patterns(observed["content"], expect["required_patterns"])
 
@@ -40,10 +46,35 @@ def assert_turn_expectations(expect: dict, observed: dict) -> None:
         )
 
     if "stable_prefix_required" in expect:
+        assert observed["stable_prefix"] is not None
         _assert_required_patterns(observed["stable_prefix"], expect["stable_prefix_required"])
 
     if "stable_prefix_forbidden" in expect:
+        assert observed["stable_prefix"] is not None
         _assert_forbidden_patterns(observed["stable_prefix"], expect["stable_prefix_forbidden"])
+
+    if "expected_response_mode_selected" in expect:
+        assert (
+            observed["response_mode_selected"]
+            == expect["expected_response_mode_selected"]
+        )
+
+    if "expected_response_mode_effective" in expect:
+        assert (
+            observed["response_mode_effective"]
+            == expect["expected_response_mode_effective"]
+        )
+
+    if "expected_evidence_sufficient" in expect:
+        assert observed["evidence_sufficient"] is bool(
+            expect["expected_evidence_sufficient"]
+        )
+
+    if "expected_downgrade_reason" in expect:
+        assert observed["downgrade_reason"] == expect["expected_downgrade_reason"]
+
+    if "expected_grounded" in expect:
+        assert observed["grounded"] is bool(expect["expected_grounded"])
 
     if "disambiguation_resolved" in expect:
         _assert_disambiguation_flag(

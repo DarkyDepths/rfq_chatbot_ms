@@ -21,7 +21,7 @@
         "route": "tools_pipeline",
         "disambiguation_resolved": true,
         "source_refs_present": false,
-        "required_patterns": ["cannot retrieve the requested information"]
+        "required_patterns": ["don't have grounded RFQ data"]
       }
     }
   ]

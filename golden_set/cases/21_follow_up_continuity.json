@@ -22,9 +22,14 @@
       "expect": {
         "intent": "rfq_specific",
         "route": "tools_pipeline",
-        "source_refs_present": false,
-        "required_patterns": ["cannot retrieve the requested information"],
-        "confidence_marker": "absent"
+        "source_refs_present": true,
+        "required_patterns": ["RFQ summary", "Boiler Upgrade", "Readiness"],
+        "confidence_marker": "absent",
+        "expected_response_mode_selected": "RFQ_SUMMARY",
+        "expected_response_mode_effective": "RFQ_SUMMARY",
+        "expected_evidence_sufficient": true,
+        "expected_downgrade_reason": null,
+        "expected_grounded": true
       }
     }
   ]

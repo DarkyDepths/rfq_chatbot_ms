@@ -9,7 +9,7 @@
     {
       "user_content": "What is PWHT?",
       "expect": {
-        "intent": "general_knowledge",
+        "intent": "domain_knowledge",
         "route": "direct_llm",
         "tools_exclude": ["get_rfq_profile", "get_rfq_stage", "get_rfq_snapshot", "get_capability_status"],
         "source_refs_present": false,

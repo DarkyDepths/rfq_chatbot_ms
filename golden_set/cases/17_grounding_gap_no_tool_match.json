@@ -1,6 +1,6 @@
 {
   "id": "grounding_gap_no_tool_match",
-  "description": "RFQ-specific turn with no retrieval keyword triggers grounding-gap response.",
+  "description": "RFQ-specific summary turn without old retrieval keyword still produces grounded Phase 7B summary.",
   "session": {
     "mode": "rfq",
     "rfq_id": "__AUTO_UUID__",
@@ -13,8 +13,13 @@
         "intent": "rfq_specific",
         "route": "tools_pipeline",
         "source_refs_present": true,
-        "required_patterns": ["cannot retrieve the requested information"],
-        "confidence_marker": "absent"
+        "required_patterns": ["RFQ summary", "Boiler Upgrade", "Readiness"],
+        "confidence_marker": "absent",
+        "expected_response_mode_selected": "RFQ_SUMMARY",
+        "expected_response_mode_effective": "RFQ_SUMMARY",
+        "expected_evidence_sufficient": true,
+        "expected_downgrade_reason": null,
+        "expected_grounded": true
       }
     }
   ]

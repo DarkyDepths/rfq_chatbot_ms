@@ -18,7 +18,12 @@
         "route": "tools_pipeline",
         "tools_include": ["retrieval_unavailable"],
         "source_refs_present": false,
-        "required_patterns": ["cannot retrieve the requested information"]
+        "required_patterns": ["don't have grounded RFQ data"],
+        "expected_response_mode_selected": "FACT_FIELD",
+        "expected_response_mode_effective": "RFQ_SUMMARY",
+        "expected_evidence_sufficient": false,
+        "expected_downgrade_reason": "fact_field_unavailable",
+        "expected_grounded": false
       }
     }
   ]

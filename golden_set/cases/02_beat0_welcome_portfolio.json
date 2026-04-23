@@ -13,9 +13,9 @@
         "route": "conversational",
         "tools_exclude": ["get_rfq_profile", "get_rfq_stage", "get_rfq_snapshot", "get_capability_status"],
         "source_refs_present": false,
-        "required_patterns": ["welcome", "portfolio"],
+        "required_patterns": ["RFQ Copilot", "RFQs"],
         "confidence_marker": "absent",
-        "stable_prefix_required": ["first-turn conversational greeting in portfolio mode"]
+        "azure_call_occurred": false
       }
     }
   ]

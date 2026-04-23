@@ -14,9 +14,12 @@
         "route": "tools_pipeline",
         "tools_include": ["get_rfq_profile"],
         "source_refs_present": true,
-        "required_patterns": ["executive margin summary"],
-        "forbidden_patterns": ["working-level margin detail"],
-        "confidence_marker": "absent"
+        "required_patterns": ["deadline is 2026-05-01"],
+        "confidence_marker": "absent",
+        "expected_response_mode_selected": "FACT_FIELD",
+        "expected_response_mode_effective": "FACT_FIELD",
+        "expected_evidence_sufficient": true,
+        "expected_downgrade_reason": null
       }
     }
   ]

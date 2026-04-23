@@ -1,0 +1,35 @@
+{
+  "id": "phase7b_advisory_downgrade_no_snapshot",
+  "description": "Phase 7B: advisory request downgrades to detail when snapshot-backed advisory evidence is unavailable.",
+  "session": {
+    "mode": "rfq",
+    "rfq_id": "__AUTO_UUID__",
+    "role": "estimation_dept_lead"
+  },
+  "scenario": {
+    "manager_mode": "known_stage",
+    "intelligence_mode": "failure"
+  },
+  "turns": [
+    {
+      "user_content": "What should I watch out for in this RFQ?",
+      "expect": {
+        "intent": "rfq_specific",
+        "route": "tools_pipeline",
+        "source_refs_present": true,
+        "expected_min_source_ref_count": 1,
+        "expected_response_mode_selected": "RFQ_ADVISORY",
+        "expected_response_mode_effective": "RFQ_DETAIL",
+        "expected_evidence_sufficient": false,
+        "expected_downgrade_reason": "snapshot_unavailable",
+        "expected_grounded": true,
+        "required_patterns": [
+          "grounded advisory signals",
+          "falling back to current operational state",
+          "RFQ detail",
+          "Boiler Upgrade"
+        ]
+      }
+    }
+  ]
+}
