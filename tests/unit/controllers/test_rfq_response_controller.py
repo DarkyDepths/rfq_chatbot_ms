@@ -23,6 +23,44 @@ from src.models.envelope import ConfidenceLevel
 from src.tools.common.envelope import build_tool_result_envelope
 
 
+class RecordingToolController:
+    def __init__(self, *, rfq_id: uuid.UUID):
+        self.rfq_id = rfq_id
+        self.calls: list[str] = []
+
+    def execute_single_tool(self, tool_name, rfq_id, *, preloaded_rfq_detail=None):
+        self.calls.append(tool_name)
+        if tool_name == "get_rfq_profile":
+            value = preloaded_rfq_detail or _profile(rfq_id=rfq_id)
+            return build_tool_result_envelope(
+                value=value,
+                system="rfq_manager_ms",
+                artifact="rfq",
+                locator=f"/rfq-manager/v1/rfqs/{rfq_id}",
+                parsed_at=value.updated_at,
+                confidence=ConfidenceLevel.DETERMINISTIC,
+            )
+        if tool_name == "get_rfq_stage":
+            value = _stage_list()
+            return build_tool_result_envelope(
+                value=value,
+                system="rfq_manager_ms",
+                artifact="rfq_stages",
+                locator=f"/rfq-manager/v1/rfqs/{rfq_id}/stages",
+                confidence=ConfidenceLevel.DETERMINISTIC,
+            )
+        if tool_name == "get_rfq_snapshot":
+            value = _snapshot(rfq_id)
+            return build_tool_result_envelope(
+                value=value,
+                system="rfq_intelligence_ms",
+                artifact="rfq_intelligence_snapshot",
+                locator=f"/intelligence/v1/rfqs/{rfq_id}/snapshot",
+                confidence=ConfidenceLevel.DETERMINISTIC,
+            )
+        raise AssertionError(f"unexpected tool: {tool_name}")
+
+
 def _profile(*, rfq_id: uuid.UUID | None = None, progress: int = 35) -> ManagerRfqDetail:
     rfq_id = rfq_id or uuid.uuid4()
     return ManagerRfqDetail.model_validate(
@@ -151,6 +189,10 @@ def test_stage_answer_uses_profile_progress_as_canonical_value():
 
     assert plan.grounded is True
     assert plan.response_mode == "FACT_FIELD"
+    assert plan.original_response_mode == "FACT_FIELD"
+    assert plan.effective_response_mode == "FACT_FIELD"
+    assert plan.evidence_sufficient is True
+    assert plan.downgrade_reason is None
     assert plan.assistant_text == "The current stage is Review."
     assert "82%" not in plan.assistant_text
     assert {ref.artifact for ref in plan.source_refs} == {"rfq", "rfq_stages"}
@@ -303,11 +345,16 @@ def test_missing_grounded_profile_data_returns_explicit_unavailable_message():
     )
 
     assert plan.grounded is False
-    assert plan.assistant_text == "I don't have grounded RFQ owner data available right now."
+    assert plan.response_mode == "RFQ_SUMMARY"
+    assert plan.original_response_mode == "FACT_FIELD"
+    assert plan.effective_response_mode == "RFQ_SUMMARY"
+    assert plan.evidence_sufficient is False
+    assert plan.downgrade_reason == "fact_field_unavailable"
+    assert plan.assistant_text == "I don't have grounded RFQ data available right now."
     assert plan.source_refs == []
 
 
-def test_advisory_fails_honestly_when_grounded_signals_are_insufficient():
+def test_advisory_downgrades_to_detail_with_caveat_when_snapshot_is_missing():
     controller = RfqResponseController()
     rfq_id = uuid.uuid4()
     profile = _profile(rfq_id=rfq_id, progress=90)
@@ -325,11 +372,16 @@ def test_advisory_fails_honestly_when_grounded_signals_are_insufficient():
         rfq_id=rfq_id,
     )
 
-    assert plan.response_mode == "RFQ_ADVISORY"
-    assert "Main concerns\n- I do not have enough grounded risk signals to identify specific concerns reliably right now." in plan.assistant_text
-    assert "Missing / incomplete\n- I do not have a grounded intelligence snapshot to assess workbook, review, or gap signals fully." in plan.assistant_text
-    assert "What needs attention\n- I do not have enough grounded operational signals to prioritize next actions confidently right now." in plan.assistant_text
-    assert "RFQ Boiler Upgrade" not in plan.assistant_text
+    assert plan.response_mode == "RFQ_DETAIL"
+    assert plan.original_response_mode == "RFQ_ADVISORY"
+    assert plan.effective_response_mode == "RFQ_DETAIL"
+    assert plan.evidence_sufficient is False
+    assert plan.downgrade_reason == "snapshot_unavailable"
+    assert plan.assistant_text.startswith(
+        "I can show the current RFQ state, but grounded advisory signals "
+        "are not fully available because the intelligence snapshot is missing."
+    )
+    assert "Current RFQ details\n" in plan.assistant_text
     assert plan.grounded is True
 
 
@@ -350,3 +402,97 @@ def test_compose_response_synthesizes_primary_profile_record_when_missing():
     assert plan.tool_call_records[0].tool_name == "get_rfq_profile"
     assert plan.tool_call_records[0].result is not None
     assert plan.tool_call_records[0].result.source_ref is not None
+
+
+def test_compose_response_stays_backward_compatible_without_retrieval():
+    controller = RfqResponseController()
+    rfq_id = uuid.uuid4()
+    profile = _profile(rfq_id=rfq_id)
+
+    plan = controller.compose_response(
+        user_content="what is the deadline?",
+        rfq_detail=profile,
+        tool_call_records=[],
+        rfq_id=rfq_id,
+    )
+
+    assert plan.response_mode == "FACT_FIELD"
+    assert plan.effective_response_mode == "FACT_FIELD"
+    assert plan.assistant_text == "The RFQ deadline is 2026-05-01."
+    assert plan.tools_planned == ()
+    assert plan.tools_executed == ()
+    assert plan.tools_from_preload == ()
+
+
+def test_detail_downgrades_to_summary_when_only_profile_evidence_exists():
+    controller = RfqResponseController()
+    rfq_id = uuid.uuid4()
+    profile = _profile(rfq_id=rfq_id)
+
+    plan = controller.compose_response(
+        user_content="what are the current details about this rfq?",
+        rfq_detail=profile,
+        tool_call_records=[],
+        rfq_id=rfq_id,
+    )
+
+    assert plan.response_mode == "RFQ_SUMMARY"
+    assert plan.original_response_mode == "RFQ_DETAIL"
+    assert plan.effective_response_mode == "RFQ_SUMMARY"
+    assert plan.evidence_sufficient is False
+    assert plan.downgrade_reason == "detail_evidence_profile_only"
+    assert plan.assistant_text.startswith("RFQ summary\n")
+
+
+def test_compose_response_with_retrieval_plans_tools_by_mode():
+    controller = RfqResponseController()
+    rfq_id = uuid.uuid4()
+    tool_controller = RecordingToolController(rfq_id=rfq_id)
+
+    plan = controller.compose_response_with_retrieval(
+        user_content="what should I watch out for?",
+        rfq_detail=None,
+        preloaded_tool_call_records=[],
+        rfq_id=rfq_id,
+        tool_controller=tool_controller,
+    )
+
+    assert plan.response_mode == "RFQ_ADVISORY"
+    assert plan.tools_planned == ("get_rfq_profile", "get_rfq_snapshot", "get_rfq_stage")
+    assert plan.tools_executed == ("get_rfq_profile", "get_rfq_snapshot", "get_rfq_stage")
+    assert tool_controller.calls == ["get_rfq_profile", "get_rfq_snapshot", "get_rfq_stage"]
+    assert plan.evidence_sufficient is True
+
+
+def test_compose_response_with_retrieval_reuses_preloaded_records():
+    controller = RfqResponseController()
+    rfq_id = uuid.uuid4()
+    profile = _profile(rfq_id=rfq_id)
+    preloaded_profile = _record(
+        "get_rfq_profile",
+        profile,
+        system="rfq_manager_ms",
+        artifact="rfq",
+        locator=f"/rfq-manager/v1/rfqs/{rfq_id}",
+    )
+    preloaded_snapshot = _record(
+        "get_rfq_snapshot",
+        _snapshot(rfq_id),
+        system="rfq_intelligence_ms",
+        artifact="rfq_intelligence_snapshot",
+        locator=f"/intelligence/v1/rfqs/{rfq_id}/snapshot",
+    )
+    tool_controller = RecordingToolController(rfq_id=rfq_id)
+
+    plan = controller.compose_response_with_retrieval(
+        user_content="what should I watch out for?",
+        rfq_detail=profile,
+        preloaded_tool_call_records=[preloaded_profile, preloaded_snapshot],
+        rfq_id=rfq_id,
+        tool_controller=tool_controller,
+    )
+
+    assert plan.tools_planned == ("get_rfq_profile", "get_rfq_snapshot", "get_rfq_stage")
+    assert plan.tools_from_preload == ("get_rfq_profile", "get_rfq_snapshot")
+    assert plan.tools_executed == ("get_rfq_stage",)
+    assert tool_controller.calls == ["get_rfq_stage"]

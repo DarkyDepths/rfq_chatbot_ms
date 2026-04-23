@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 import uuid
 
 from src.connectors.intelligence_connector import IntelligenceSnapshotArtifact
@@ -17,9 +17,44 @@ from src.models.conversation import ToolCallRecord
 from src.models.envelope import ConfidenceLevel, SourceRef
 from src.tools.common.envelope import build_tool_result_envelope
 
+if TYPE_CHECKING:
+    from src.controllers.tool_controller import ToolController
+
 
 RfqResponseMode = Literal["FACT_FIELD", "RFQ_SUMMARY", "RFQ_DETAIL", "RFQ_ADVISORY"]
 AdvisoryFocus = Literal["watchouts", "risks", "missing", "attention"]
+
+
+@dataclass(frozen=True)
+class ToolModePlan:
+    """Mode-owned retrieval requirements."""
+
+    required_tools: tuple[str, ...]
+    optional_tools: tuple[str, ...] = ()
+    downgrade_target: RfqResponseMode | None = None
+
+
+TOOL_MODE_MATRIX: dict[RfqResponseMode, ToolModePlan] = {
+    "FACT_FIELD": ToolModePlan(
+        required_tools=("get_rfq_profile",),
+        optional_tools=("get_rfq_stage",),
+        downgrade_target="RFQ_SUMMARY",
+    ),
+    "RFQ_SUMMARY": ToolModePlan(
+        required_tools=("get_rfq_profile",),
+        optional_tools=("get_rfq_snapshot",),
+    ),
+    "RFQ_DETAIL": ToolModePlan(
+        required_tools=("get_rfq_profile", "get_rfq_stage"),
+        optional_tools=("get_rfq_snapshot",),
+        downgrade_target="RFQ_SUMMARY",
+    ),
+    "RFQ_ADVISORY": ToolModePlan(
+        required_tools=("get_rfq_profile", "get_rfq_snapshot"),
+        optional_tools=("get_rfq_stage",),
+        downgrade_target="RFQ_DETAIL",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -91,6 +126,17 @@ class ResponseModeSelection:
 
 
 @dataclass(frozen=True)
+class EvidenceEvaluation:
+    """Pre-render evidence sufficiency check."""
+
+    original_mode: RfqResponseMode
+    effective_mode: RfqResponseMode
+    sufficient: bool
+    downgrade_reason: str | None = None
+    caveat_text: str | None = None
+
+
+@dataclass(frozen=True)
 class RfqResponsePlan:
     """Deterministic grounded RFQ response plus persistence payload."""
 
@@ -99,6 +145,13 @@ class RfqResponsePlan:
     grounded: bool
     source_refs: list[SourceRef]
     tool_call_records: list[ToolCallRecord]
+    original_response_mode: RfqResponseMode | None = None
+    effective_response_mode: RfqResponseMode | None = None
+    evidence_sufficient: bool = True
+    downgrade_reason: str | None = None
+    tools_planned: tuple[str, ...] = ()
+    tools_executed: tuple[str, ...] = ()
+    tools_from_preload: tuple[str, ...] = ()
 
 
 class RfqResponseController:
@@ -167,6 +220,89 @@ class RfqResponseController:
         tool_call_records: list[ToolCallRecord],
         rfq_id: str | uuid.UUID | None,
     ) -> RfqResponsePlan:
+        return self._compose_from_records(
+            user_content=user_content,
+            rfq_detail=rfq_detail,
+            tool_call_records=tool_call_records,
+            rfq_id=rfq_id,
+        )
+
+    def compose_response_with_retrieval(
+        self,
+        *,
+        user_content: str,
+        rfq_detail: ManagerRfqDetail | None,
+        preloaded_tool_call_records: list[ToolCallRecord],
+        rfq_id: str | uuid.UUID | None,
+        tool_controller: ToolController,
+    ) -> RfqResponsePlan:
+        normalized_content = " ".join(user_content.lower().split())
+        selection = self._select_response_mode(normalized_content)
+        tools_planned = self._plan_tools_for_mode(
+            selection=selection,
+            normalized_content=normalized_content,
+        )
+        normalized_records = self._ensure_primary_profile_record(
+            rfq_detail=rfq_detail,
+            tool_call_records=preloaded_tool_call_records,
+            rfq_id=rfq_id,
+        )
+        available_tools = self._valid_tool_names(normalized_records)
+        tools_from_preload = tuple(
+            tool_name
+            for tool_name in tools_planned
+            if tool_name in self._valid_tool_names(preloaded_tool_call_records)
+        )
+        rfq_uuid = self._coerce_uuid(rfq_id) or getattr(rfq_detail, "id", None)
+
+        executed_records: list[ToolCallRecord] = []
+        tools_executed: list[str] = []
+        if rfq_uuid is not None:
+            for tool_name in tools_planned:
+                if tool_name in available_tools:
+                    continue
+                result = tool_controller.execute_single_tool(
+                    tool_name,
+                    rfq_uuid,
+                    preloaded_rfq_detail=rfq_detail,
+                )
+                executed_records.append(
+                    ToolCallRecord(
+                        tool_name=tool_name,
+                        arguments={
+                            "rfq_id": str(rfq_uuid),
+                            "selection_reason": (
+                                f"Phase 7B mode-driven retrieval ({selection.mode})"
+                            ),
+                        },
+                        result=result,
+                        source_refs=[result.source_ref] if result.source_ref else [],
+                    )
+                )
+                tools_executed.append(tool_name)
+                available_tools.add(tool_name)
+
+        return self._compose_from_records(
+            user_content=user_content,
+            rfq_detail=rfq_detail,
+            tool_call_records=[*normalized_records, *executed_records],
+            rfq_id=rfq_id,
+            tools_planned=tools_planned,
+            tools_executed=tuple(tools_executed),
+            tools_from_preload=tools_from_preload,
+        )
+
+    def _compose_from_records(
+        self,
+        *,
+        user_content: str,
+        rfq_detail: ManagerRfqDetail | None,
+        tool_call_records: list[ToolCallRecord],
+        rfq_id: str | uuid.UUID | None,
+        tools_planned: tuple[str, ...] = (),
+        tools_executed: tuple[str, ...] = (),
+        tools_from_preload: tuple[str, ...] = (),
+    ) -> RfqResponsePlan:
         normalized_tool_call_records = self._ensure_primary_profile_record(
             rfq_detail=rfq_detail,
             tool_call_records=tool_call_records,
@@ -178,17 +314,41 @@ class RfqResponseController:
         )
         normalized_content = " ".join(user_content.lower().split())
         selection = self._select_response_mode(normalized_content)
-        assistant_text, source_refs = self._render_for_mode(
+        evidence = self._evaluate_evidence(
             selection=selection,
             normalized_content=normalized_content,
             unified_view=unified_view,
         )
+        effective_selection = ResponseModeSelection(
+            mode=evidence.effective_mode,
+            advisory_focus=(
+                selection.advisory_focus
+                if evidence.effective_mode == "RFQ_ADVISORY"
+                else None
+            ),
+        )
+        assistant_text, source_refs = self._render_for_mode(
+            selection=effective_selection,
+            normalized_content=normalized_content,
+            unified_view=unified_view,
+        )
+        assistant_text = self._with_downgrade_caveat(
+            assistant_text=assistant_text,
+            evidence=evidence,
+        )
         return RfqResponsePlan(
-            response_mode=selection.mode,
+            response_mode=evidence.effective_mode,
             assistant_text=assistant_text,
             grounded=bool(source_refs),
             source_refs=source_refs,
             tool_call_records=normalized_tool_call_records,
+            original_response_mode=selection.mode,
+            effective_response_mode=evidence.effective_mode,
+            evidence_sufficient=evidence.sufficient,
+            downgrade_reason=evidence.downgrade_reason,
+            tools_planned=tools_planned,
+            tools_executed=tools_executed,
+            tools_from_preload=tools_from_preload,
         )
 
     def _ensure_primary_profile_record(
@@ -329,6 +489,132 @@ class RfqResponseController:
             stage_source_ref=stage_source_ref,
             snapshot_source_ref=snapshot_source_ref,
         )
+
+    def _evaluate_evidence(
+        self,
+        *,
+        selection: ResponseModeSelection,
+        normalized_content: str,
+        unified_view: UnifiedRfqView,
+    ) -> EvidenceEvaluation:
+        if selection.mode == "FACT_FIELD":
+            if self._fact_field_supported(
+                normalized_content=normalized_content,
+                unified_view=unified_view,
+            ):
+                return EvidenceEvaluation(
+                    original_mode=selection.mode,
+                    effective_mode=selection.mode,
+                    sufficient=True,
+                )
+            return EvidenceEvaluation(
+                original_mode=selection.mode,
+                effective_mode=TOOL_MODE_MATRIX[selection.mode].downgrade_target
+                or "RFQ_SUMMARY",
+                sufficient=False,
+                downgrade_reason="fact_field_unavailable",
+            )
+
+        if selection.mode == "RFQ_SUMMARY":
+            return EvidenceEvaluation(
+                original_mode=selection.mode,
+                effective_mode=selection.mode,
+                sufficient=bool(
+                    self._dedupe_refs(
+                        [
+                            unified_view.profile_source_ref,
+                            unified_view.stage_source_ref,
+                            unified_view.snapshot_source_ref,
+                        ]
+                    )
+                ),
+            )
+
+        if selection.mode == "RFQ_DETAIL":
+            has_profile = unified_view.profile_source_ref is not None
+            has_additional_source = (
+                unified_view.stage_source_ref is not None
+                or unified_view.snapshot_source_ref is not None
+            )
+            if has_profile and has_additional_source:
+                return EvidenceEvaluation(
+                    original_mode=selection.mode,
+                    effective_mode=selection.mode,
+                    sufficient=True,
+                )
+            if has_profile:
+                return EvidenceEvaluation(
+                    original_mode=selection.mode,
+                    effective_mode=TOOL_MODE_MATRIX[selection.mode].downgrade_target
+                    or "RFQ_SUMMARY",
+                    sufficient=False,
+                    downgrade_reason="detail_evidence_profile_only",
+                )
+            return EvidenceEvaluation(
+                original_mode=selection.mode,
+                effective_mode=selection.mode,
+                sufficient=False,
+                downgrade_reason="detail_evidence_unavailable",
+            )
+
+        if unified_view.snapshot_source_ref is not None:
+            return EvidenceEvaluation(
+                original_mode=selection.mode,
+                effective_mode=selection.mode,
+                sufficient=True,
+            )
+        return EvidenceEvaluation(
+            original_mode=selection.mode,
+            effective_mode=TOOL_MODE_MATRIX[selection.mode].downgrade_target
+            or "RFQ_DETAIL",
+            sufficient=False,
+            downgrade_reason="snapshot_unavailable",
+            caveat_text=(
+                "I can show the current RFQ state, but grounded advisory signals "
+                "are not fully available because the intelligence snapshot is missing. "
+                "This response is falling back to current operational state."
+            ),
+        )
+
+    def _plan_tools_for_mode(
+        self,
+        *,
+        selection: ResponseModeSelection,
+        normalized_content: str,
+    ) -> tuple[str, ...]:
+        mode_plan = TOOL_MODE_MATRIX[selection.mode]
+        tools = list(mode_plan.required_tools)
+        if selection.mode == "FACT_FIELD":
+            if self._contains_any(normalized_content, self.stage_terms):
+                tools.extend(mode_plan.optional_tools)
+        else:
+            tools.extend(mode_plan.optional_tools)
+        return tuple(dict.fromkeys(tools))
+
+    @staticmethod
+    def _valid_tool_names(tool_call_records: list[ToolCallRecord]) -> set[str]:
+        return {
+            record.tool_name
+            for record in tool_call_records
+            if record.result is not None
+            and record.result.confidence != ConfidenceLevel.ABSENT
+        }
+
+    @staticmethod
+    def _with_downgrade_caveat(
+        *,
+        assistant_text: str,
+        evidence: EvidenceEvaluation,
+    ) -> str:
+        if (
+            evidence.original_mode == "RFQ_ADVISORY"
+            and evidence.effective_mode == "RFQ_DETAIL"
+            and evidence.downgrade_reason == "snapshot_unavailable"
+            and evidence.caveat_text
+            and assistant_text
+        ):
+            return f"{evidence.caveat_text}\n\n{assistant_text}"
+        return assistant_text
 
     def _select_response_mode(self, normalized_content: str) -> ResponseModeSelection:
         if self._contains_any(normalized_content, self.advisory_missing_terms):
@@ -833,6 +1119,76 @@ class RfqResponseController:
             return f"The industry is {value}."
         return f"{label.capitalize()}: {value}."
 
+    def _fact_field_supported(
+        self,
+        *,
+        normalized_content: str,
+        unified_view: UnifiedRfqView,
+    ) -> bool:
+        if self._contains_any(normalized_content, self.rfq_code_terms):
+            return self._has_value(unified_view.rfq_code) and bool(
+                self._dedupe_refs(
+                    [unified_view.profile_source_ref, unified_view.snapshot_source_ref]
+                )
+            )
+
+        if self._contains_any(normalized_content, self.lifecycle_terms):
+            has_fact = any(
+                self._has_value(value)
+                for value in (
+                    unified_view.status,
+                    unified_view.current_stage_name,
+                    unified_view.progress,
+                )
+            )
+            return has_fact and bool(
+                self._dedupe_refs(
+                    [unified_view.profile_source_ref, unified_view.stage_source_ref]
+                )
+            )
+
+        if self._contains_any(normalized_content, self.stage_terms):
+            refs = self._dedupe_refs(
+                [unified_view.profile_source_ref, unified_view.stage_source_ref]
+            )
+            if not refs:
+                return False
+            if self._contains_any(normalized_content, ("assigned team", "team")):
+                return (
+                    unified_view.stage is not None
+                    and self._has_value(unified_view.stage.assigned_team)
+                )
+            if self._contains_any(normalized_content, ("blocker", "blocked")):
+                return (
+                    unified_view.stage is not None
+                    and self._has_value(unified_view.stage.blocker_status)
+                )
+            return self._has_value(unified_view.current_stage_name)
+
+        requested_values: list[object] = []
+        if self._contains_any(normalized_content, self.owner_terms):
+            requested_values.append(unified_view.owner)
+        if self._contains_any(normalized_content, self.deadline_terms):
+            requested_values.append(unified_view.deadline)
+        if self._contains_any(normalized_content, self.status_terms):
+            requested_values.append(unified_view.status)
+        if self._contains_any(normalized_content, self.progress_terms):
+            requested_values.append(unified_view.progress)
+        if self._contains_any(normalized_content, self.client_terms):
+            requested_values.append(unified_view.client)
+        if self._contains_any(normalized_content, self.workflow_terms):
+            requested_values.append(unified_view.workflow_name)
+        if self._contains_any(normalized_content, self.priority_terms):
+            requested_values.append(unified_view.priority)
+        if self._contains_any(normalized_content, self.country_terms):
+            requested_values.append(unified_view.country)
+        if self._contains_any(normalized_content, self.industry_terms):
+            requested_values.append(unified_view.industry)
+
+        return bool(requested_values) and unified_view.profile_source_ref is not None and all(
+            self._has_value(value) for value in requested_values
+        )
+
     def _is_fact_field_request(self, normalized_content: str) -> bool:
         field_families = (
             self.owner_terms,
@@ -898,6 +1254,14 @@ class RfqResponseController:
     @staticmethod
     def _contains_any(normalized_content: str, terms: tuple[str, ...]) -> bool:
         return any(term in normalized_content for term in terms)
+
+    @staticmethod
+    def _has_value(value) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        return True
 
     @staticmethod
     def _latest_record(
